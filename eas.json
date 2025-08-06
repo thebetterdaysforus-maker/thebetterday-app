@@ -7,27 +7,20 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "env": {
-        "EXPO_PACKAGE_MANAGER": "npm"
-      },
       "android": {
         "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
-      "env": {
-        "EXPO_PACKAGE_MANAGER": "npm"
-      },
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
+        "buildType": "apk"
+      },
+      "env": {
+        "NODE_ENV": "development"
       }
     },
     "production": {
-      "env": {
-        "EXPO_PACKAGE_MANAGER": "npm"
-      },
       "android": {
         "buildType": "apk"
       }
