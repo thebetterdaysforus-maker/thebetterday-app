@@ -1,0 +1,44 @@
+{
+  "v": "5.7.4",
+  "meta": {
+    "g": "TheBetterDay Splash Animation",
+    "a": "Author",
+    "k": "footprint, splash, animation",
+    "d": "Splash screen animation with golden footprints",
+    "tc": ""
+  },
+  "fr": 30,
+  "ip": 0,
+  "op": 60,
+  "w": 1080,
+  "h": 1920,
+  "nm": "SplashAnimation",
+  "ddd": 0,
+  "assets": [],
+  "layers": [
+    {
+      "ddd": 0,
+      "ind": 1,
+      "ty": 1,
+      "nm": "Background",
+      "sr": 1,
+      "ks": {
+        "o": {"a": 0, "k": 100},
+        "r": {"a": 0, "k": 0},
+        "p": {"a": 0, "k": [540, 960, 0]},
+        "a": {"a": 0, "k": [540, 960, 0]},
+        "s": {"a": 0, "k": [100, 100, 100]}
+      },
+      "ao": 0,
+      "sw": 1080,
+      "sh": 1920,
+      "sc": "#000000",
+      "ip": 0,
+      "op": 60,
+      "st": 0,
+      "bm": 0
+    }
+  ],
+  "markers": [],
+  "chars": []
+}
