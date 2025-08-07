@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "TheBetterDay",
+    "slug": "TheBetterDay",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icons/main_logo.png",
+    "scheme": "thebetterday",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "main": "index.js",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.anonymous.TheBetterDay"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-notifications"
+    ]
+  }
+}
