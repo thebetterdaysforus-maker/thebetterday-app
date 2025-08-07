@@ -16,7 +16,6 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "credentialsSource": "local"
       }
     },
     "production": {
