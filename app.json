@@ -13,7 +13,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.anonymous.TheBetterDay"
+      "package": "com.thebetterday.app"
     },
     "web": {
       "bundler": "metro"
