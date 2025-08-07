@@ -16,7 +16,7 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug"
+        "credentialsSource": "local"
       }
     },
     "production": {
