@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import useRetrospectStore from "../store/retrospectStore";
 import useGoalStore from "../store/goalStore";
-import { format } from "date-fns";
+// date-fns 제거하고 네이티브 Date 사용
 
 export default function RetrospectScreen({ navigation }: any) {
   const [txt, setTxt] = useState("");
@@ -20,11 +20,11 @@ export default function RetrospectScreen({ navigation }: any) {
 
   const { allDone, hasFailure } = getTodaySummary();
 
-  // 오늘의 실패한 목표들 가져오기
+  // 오늘의 실패한 목표들 가져오기 - 네이티브 Date 사용
   const today = new Date();
-  const todayStr = format(today, "yyyy-MM-dd");
+  const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
   const failedGoals = goals.filter((goal) => {
-    const goalDate = format(new Date(goal.target_time), "yyyy-MM-dd");
+    const goalDate = new Date(goal.target_time).toISOString().split('T')[0];
     return goalDate === todayStr && goal.status === "failure";
   });
 
@@ -78,7 +78,7 @@ export default function RetrospectScreen({ navigation }: any) {
           {failedGoals.map((goal) => (
             <View key={goal.id} style={styles.failedGoalItem}>
               <Text style={styles.failedGoalTime}>
-                {format(new Date(goal.target_time), "HH:mm")}
+                {new Date(goal.target_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
               </Text>
               <Text style={styles.failedGoalTitle}>{goal.title}</Text>
             </View>
