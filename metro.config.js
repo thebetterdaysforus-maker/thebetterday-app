@@ -23,6 +23,8 @@ config.resolver.alias = {
   'fs': false,
   'net': false,
   'tls': false,
+  // @supabase/node-fetch stream 오류 강제 해결
+  '@supabase/node-fetch': '@supabase/supabase-js/dist/main/lib/fetch',
 };
 
 // 패키지 exports 사용 중지 - Metro 0.82+ 호환성 문제 해결
@@ -42,6 +44,8 @@ config.resolver.blockList = [
   /node_modules\/.*\/tests\/.*/,
   /node_modules\/.*\/\.md$/,
   /node_modules\/.*\/\.cache\/.*/,
+  // @supabase/node-fetch 완전 차단
+  /node_modules\/@supabase\/node-fetch\/.*/,
 ];
 
 // 캐시 및 Babel 설정
