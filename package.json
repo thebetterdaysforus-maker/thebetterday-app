@@ -36,6 +36,7 @@
     "babel-preset-expo": "~13.0.0",
     "badwords-ko": "^1.0.4",
     "buffer": "^6.0.3",
+    "cross-fetch": "^4.1.0",
     "crypto-browserify": "^3.12.1",
     "date-fns": "^4.1.0",
     "eas-cli": "^16.17.4",
