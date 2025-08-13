@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // 안전하고 단순한 환경 변수 처리
@@ -42,14 +43,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
-// APK 환경에서 안전한 Supabase 클라이언트 생성
+// RN 권장 방식으로 Supabase 클라이언트 생성
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    // APK 환경에서 세션 저장소 설정
-    storage: typeof window !== 'undefined' && window.localStorage ? window.localStorage : undefined,
   },
   // APK 환경에서 네트워크 오류 처리
   global: {
