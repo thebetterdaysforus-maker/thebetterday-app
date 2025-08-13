@@ -34,8 +34,8 @@ config.resolver.alias = {
   'date-fns': require.resolve('date-fns'),
 };
 
-// Package Exports 활성화 (SDK 53 기본값) - 조건 우선순위로 제어
-config.resolver.unstable_enablePackageExports = true;
+// Package Exports 비활성화 - date-fns 호환성 문제 해결
+config.resolver.unstable_enablePackageExports = false;
 
 // Optimize bundle loading
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
