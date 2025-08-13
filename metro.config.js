@@ -37,6 +37,24 @@ config.resolver.unstable_enablePackageExports = true;
 // Optimize bundle loading
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
+// 커스텀 resolveRequest로 특정 모듈을 대체
+const originalResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // @supabase/node-fetch와 ws를 안전한 대체재로 치환
+  if (moduleName === '@supabase/node-fetch' || moduleName === 'node-fetch') {
+    return context.resolveRequest(context, 'cross-fetch', platform);
+  }
+  if (moduleName === 'ws') {
+    // RN 환경에서는 기본 WebSocket 사용 (stream 의존성 없음)
+    return {
+      type: 'empty',
+    };
+  }
+  return originalResolveRequest
+    ? originalResolveRequest(context, moduleName, platform)
+    : context.resolveRequest(context, moduleName, platform);
+};
+
 // 개발 환경에서 불필요한 파일 제외 (정리된 구조 반영)
 config.resolver.blockList = [
   /attached_assets\/.*/,
@@ -51,6 +69,8 @@ config.resolver.blockList = [
   // @supabase/node-fetch 완전 차단 및 fallback 제공
   /node_modules\/@supabase\/node-fetch\/.*/,
   /@supabase\/node-fetch/,
+  // ws 모듈도 차단 (realtime 경유 stream 오류 방지)
+  /node_modules\/ws\/.*/,
 ];
 
 // 캐시 및 Babel 설정
