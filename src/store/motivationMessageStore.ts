@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { supabase } from "../supabaseClient";
-import { format, subDays } from "date-fns";
+// date-fns 제거하고 네이티브 Date 사용
 
 export interface MotivationMessage {
   id: string;
@@ -69,15 +69,17 @@ export const useMotivationMessageStore = create<MotivationMessageState>(
         } = await supabase.auth.getSession();
         if (!session) return "base";
 
-        const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0]; // YYYY-MM-DD
 
         // 전날 목표들 가져오기
         const { data: goals, error } = await supabase
           .from("goals")
           .select("status")
           .eq("user_id", session.user.id)
-          .gte("target_time", `${yesterday}T00:00:00Z`)
-          .lt("target_time", `${yesterday}T23:59:59Z`);
+          .gte("target_time", `${yesterdayStr}T00:00:00Z`)
+          .lt("target_time", `${yesterdayStr}T23:59:59Z`);
 
         if (error) throw error;
 
