@@ -1,6 +1,26 @@
 // 🔄 오프라인 데이터 관리자
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Goal, Retrospect } from '../types/goal';
+// 간소화된 타입 정의 (임시)
+interface Goal {
+  id: string;
+  user_id: string;
+  title: string;
+  target_time: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  is_essential?: boolean;
+  essential_category?: string | null;
+}
+
+interface Retrospect {
+  id: string;
+  user_id: string;
+  date: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
 import { getKoreaTime, getTodayKorea } from './timeUtils';
 
 interface PendingSync {
@@ -158,8 +178,8 @@ export class OfflineDataManager {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      const response = await fetch('https://www.google.com', { 
-        method: 'HEAD',
+      const response = await fetch('data:text/plain,test', { 
+        method: 'GET',
         signal: controller.signal
       });
       

@@ -1,43 +1,44 @@
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 
-// APK 환경에서 안전한 환경 변수 처리
-let supabaseUrl: string;
-let supabaseAnonKey: string;
-
-try {
-  // 다양한 환경에서 환경 변수 가져오기
-  supabaseUrl = 
-    Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || 
-    (Constants.manifest as any)?.extra?.EXPO_PUBLIC_SUPABASE_URL ||
-    process.env.EXPO_PUBLIC_SUPABASE_URL ||
-    '';
-    
-  supabaseAnonKey = 
-    Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || 
-    (Constants.manifest as any)?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-    '';
-} catch (error) {
-  console.log('환경 변수 로딩 중 오류 (정상적으로 처리됨):', error);
-  supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-  supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
-}
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables - check configuration');
-  console.error('supabaseUrl:', supabaseUrl ? '설정됨' : '없음');
-  console.error('supabaseAnonKey:', supabaseAnonKey ? '설정됨' : '없음');
+// 안전하고 단순한 환경 변수 처리
+const getEnvVar = (key: string): string => {
+  // 1순위: Constants.expoConfig (EAS 빌드)
+  if (Constants.expoConfig?.extra?.[key]) {
+    return Constants.expoConfig.extra[key];
+  }
   
-  // APK 환경에서는 오류 대신 경고만 표시하고 기본값 사용
-  if (supabaseUrl && !supabaseAnonKey) {
-    console.warn('⚠️ Supabase URL만 설정됨 - 읽기 전용 모드로 동작할 수 있음');
-  } else if (!supabaseUrl && supabaseAnonKey) {
-    console.warn('⚠️ Supabase Key만 설정됨 - URL 없이 동작 불가');
+  // 2순위: process.env (개발 환경)
+  if (process.env[key]) {
+    return process.env[key];
+  }
+  
+  // 3순위: manifest fallback (구버전 호환)
+  if ((Constants.manifest as any)?.extra?.[key]) {
+    return (Constants.manifest as any).extra[key];
+  }
+  
+  return '';
+};
+
+const supabaseUrl = getEnvVar('EXPO_PUBLIC_SUPABASE_URL');
+const supabaseAnonKey = getEnvVar('EXPO_PUBLIC_SUPABASE_ANON_KEY');
+
+// 환경변수 검증 (프로덕션에서는 간소화된 로깅)
+if (!supabaseUrl || !supabaseAnonKey) {
+  const isDev = __DEV__ || process.env.NODE_ENV === 'development';
+  
+  if (isDev) {
+    console.warn('⚠️ Supabase 환경변수 확인 필요');
+    console.warn('URL:', supabaseUrl ? '설정됨' : '없음');
+    console.warn('Key:', supabaseAnonKey ? '설정됨' : '없음');
+  }
+  
+  if (!supabaseUrl) {
     throw new Error('Supabase URL이 필요합니다');
-  } else {
-    console.warn('⚠️ Supabase 환경변수 누락 - 로컬 모드로 동작');
-    throw new Error('Supabase 설정이 필요합니다');
+  }
+  if (!supabaseAnonKey) {
+    throw new Error('Supabase API Key가 필요합니다');
   }
 }
 
@@ -78,7 +79,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         clearTimeout(timeoutId);
         return response;
       } catch (error) {
-        console.log('🌐 네트워크 요청 실패:', error);
+        if (__DEV__) {
+          console.log('🌐 네트워크 요청 실패:', error);
+        }
         throw error;
       }
     },

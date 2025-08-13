@@ -979,7 +979,7 @@ const useGoalStore = create<GoalState>((set, get) => ({
       throw new Error("내일 목표는 최소 5개 이상 유지해야 합니다.");
     }
 
-    console.log("🗑️ 목표 삭제 검증:", {
+    if (__DEV__) console.log("🗑️ 목표 삭제 검증:", {
       목표ID: id,
       목표날짜: goalDateKey,
       오늘날짜: todayKey,

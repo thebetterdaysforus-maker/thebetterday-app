@@ -78,7 +78,7 @@ export const useFlexibleGoalStore = create<FlexibleGoalState>((set, get) => ({
 
       set({ goals });
     } catch (error) {
-      console.error('유연한 목표 가져오기 오류:', error);
+      if (__DEV__) console.error('유연한 목표 가져오기 오류:', error);
     }
   },
 
@@ -91,7 +91,7 @@ export const useFlexibleGoalStore = create<FlexibleGoalState>((set, get) => ({
     
     // 해당 날짜에 이미 목표가 있는지 확인
     const existingGoal = get().goals.find(g => g.date === targetDate);
-    console.log("🔍 FlexibleGoalStore 중복 검사:", {
+    if (__DEV__) console.log("🔍 FlexibleGoalStore 중복 검사:", {
       targetDate,
       existingGoal: existingGoal ? { id: existingGoal.id, title: existingGoal.title, date: existingGoal.date } : null,
       현재목표개수: get().goals.length

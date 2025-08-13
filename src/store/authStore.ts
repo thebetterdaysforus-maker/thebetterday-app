@@ -29,7 +29,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // 자동 로그인 활성화됨
       }
     } catch (error) {
-      console.error('자동 로그인 활성화 실패:', error);
+      if (__DEV__) console.error('자동 로그인 활성화 실패:', error);
     }
   },
 
@@ -40,7 +40,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isAutoLoginEnabled: false });
       // 자동 로그인 비활성화됨
     } catch (error) {
-      console.error('자동 로그인 비활성화 실패:', error);
+      if (__DEV__) console.error('자동 로그인 비활성화 실패:', error);
     }
   },
 

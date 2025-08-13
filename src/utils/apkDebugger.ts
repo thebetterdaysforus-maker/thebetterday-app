@@ -2,64 +2,69 @@
 import { Platform } from 'react-native';
 
 export const logAPKEnvironment = () => {
+  // 개발 환경에서만 상세 로깅
+  if (!__DEV__) {
+    return;
+  }
+  
   console.log('📱 APK 환경 정보:');
   console.log('- Platform:', Platform?.OS || 'unknown');
-  console.log('- Global exists:', typeof global !== 'undefined');
-  console.log('- Window exists:', typeof window !== 'undefined');
-  console.log('- LocalStorage exists:', typeof localStorage !== 'undefined');
-  console.log('- Process exists:', typeof process !== 'undefined');
-  console.log('- Buffer exists:', typeof Buffer !== 'undefined');
-  console.log('- Fetch exists:', typeof fetch !== 'undefined');
-  console.log('- AbortController exists:', typeof AbortController !== 'undefined');
+  console.log('- 기본 API 지원:', {
+    fetch: typeof fetch !== 'undefined',
+    localStorage: typeof localStorage !== 'undefined',
+    AbortController: typeof AbortController !== 'undefined'
+  });
   
-  // 환경 변수 체크
+  // 환경 변수 체크 (민감 정보 제외)
   try {
-    const hasSupabaseUrl = !!(process?.env?.EXPO_PUBLIC_SUPABASE_URL || 
-                             (global as any)?.expo?.EXPO_PUBLIC_SUPABASE_URL);
-    const hasSupabaseKey = !!(process?.env?.EXPO_PUBLIC_SUPABASE_ANON_KEY || 
-                             (global as any)?.expo?.EXPO_PUBLIC_SUPABASE_ANON_KEY);
-    console.log('- Supabase URL:', hasSupabaseUrl ? '설정됨' : '없음');
-    console.log('- Supabase Key:', hasSupabaseKey ? '설정됨' : '없음');
+    const hasSupabaseUrl = !!(process?.env?.EXPO_PUBLIC_SUPABASE_URL);
+    const hasSupabaseKey = !!(process?.env?.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+    console.log('- 환경변수:', {
+      supabaseUrl: hasSupabaseUrl ? '설정됨' : '없음',
+      supabaseKey: hasSupabaseKey ? '설정됨' : '없음'
+    });
   } catch (error) {
-    console.log('- 환경 변수 확인 중 오류:', error);
+    console.log('- 환경 변수 확인 불가');
   }
 };
 
 export const testNetworkConnectivity = async (): Promise<boolean> => {
-  console.log('🌐 네트워크 연결 테스트 시작...');
-  
-  const testUrls = [
-    'https://www.google.com',
-    'https://api.github.com',
-    'https://httpbin.org/ip'
-  ];
-  
-  for (const url of testUrls) {
+  if (!__DEV__) {
+    // 프로덕션에서는 간단한 연결 테스트만
     try {
-      console.log(`- ${url} 테스트 중...`);
-      
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      setTimeout(() => controller.abort(), 5000);
       
-      const response = await fetch(url, {
-        method: 'HEAD',
+      const response = await fetch('data:text/plain,test', {
         signal: controller.signal
       });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        console.log(`✅ ${url} 연결 성공`);
-        return true;
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.log(`❌ ${url} 연결 실패:`, errorMessage);
+      return response.ok;
+    } catch {
+      return false;
     }
   }
   
-  console.log('❌ 모든 네트워크 테스트 실패');
-  return false;
+  // 개발 환경에서만 상세한 테스트
+  console.log('🌐 네트워크 연결 테스트 시작...');
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
+    // 기본 연결성만 테스트 (외부 서비스 의존성 제거)
+    const response = await fetch('data:text/plain,connectivity-test', {
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    const isConnected = response.ok;
+    
+    console.log(isConnected ? '✅ 네트워크 연결 가능' : '❌ 네트워크 연결 실패');
+    return isConnected;
+  } catch (error) {
+    console.log('❌ 네트워크 테스트 실패');
+    return false;
+  }
 };
 
 export const APKErrorReporter = {
