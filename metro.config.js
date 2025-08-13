@@ -30,8 +30,8 @@ config.resolver.alias = {
   '@supabase/node-fetch': require.resolve('cross-fetch'),
   'node-fetch': require.resolve('cross-fetch'),
   'stream': require.resolve('stream-browserify'),
-  // date-fns ESM 호환성 문제 해결
-  'date-fns': require.resolve('date-fns'),
+  // date-fns ESM 호환성 문제 해결 - index.js로 직접 매핑
+  'date-fns': './node_modules/date-fns/index.js',
 };
 
 // Package Exports 비활성화 - date-fns 호환성 문제 해결
