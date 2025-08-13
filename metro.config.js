@@ -24,7 +24,8 @@ config.resolver.alias = {
   'net': false,
   'tls': false,
   // @supabase/node-fetch stream 오류 강제 해결
-  '@supabase/node-fetch': '@supabase/supabase-js/dist/main/lib/fetch',
+  '@supabase/node-fetch': require.resolve('cross-fetch'),
+  'stream': require.resolve('stream-browserify'),
 };
 
 // 패키지 exports 사용 중지 - Metro 0.82+ 호환성 문제 해결
