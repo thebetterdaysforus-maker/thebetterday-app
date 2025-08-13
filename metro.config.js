@@ -5,6 +5,9 @@ const config = getDefaultConfig(__dirname);
 // Enable web support with proper resolution
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
+// RN/브라우저 조건을 확실히 매칭 (SDK 53 Package Exports 대응)
+config.resolver.unstable_conditionNames = ['react-native', 'browser', 'import', 'require', 'default'];
+
 // Node.js polyfills for React Native - EAS Build 호환 (강화된 폴리필)
 config.resolver.alias = {
   'stream': 'readable-stream',
@@ -28,8 +31,8 @@ config.resolver.alias = {
   'stream': require.resolve('stream-browserify'),
 };
 
-// 패키지 exports 사용 중지 - Metro 0.82+ 호환성 문제 해결
-config.resolver.unstable_enablePackageExports = false;
+// Package Exports 활성화 (SDK 53 기본값) - 조건 우선순위로 제어
+config.resolver.unstable_enablePackageExports = true;
 
 // Optimize bundle loading
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
