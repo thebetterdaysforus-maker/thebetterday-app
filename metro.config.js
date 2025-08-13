@@ -5,9 +5,8 @@ const config = getDefaultConfig(__dirname);
 // Enable web support with proper resolution
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
-// Node.js polyfills for React Native
+// Node.js polyfills for React Native - EAS Build 호환 (강화된 폴리필)
 config.resolver.alias = {
-  'react-native': 'react-native-web',
   'stream': 'readable-stream',
   'http': 'stream-http',
   'https': 'https-browserify',
@@ -17,6 +16,13 @@ config.resolver.alias = {
   'assert': 'assert',
   'buffer': 'buffer',
   'process': 'process/browser',
+  // Supabase node-fetch 호환성을 위한 추가 폴리필
+  'util': 'util',
+  'querystring': 'querystring-es3',
+  'path': 'path-browserify',
+  'fs': false,
+  'net': false,
+  'tls': false,
 };
 
 // Optimize bundle loading
