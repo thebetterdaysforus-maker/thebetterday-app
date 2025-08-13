@@ -1,4 +1,5 @@
-// APK 실행 오류 해결을 위한 안전한 초기화
+// RN/Supabase 필수 폴리필 (최우선 로드)
+import 'react-native-url-polyfill/auto';
 import 'react-native-get-random-values';
 
 // APK 환경에서 필요한 추가 polyfills
