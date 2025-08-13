@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="80" height="120" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- 왼쪽 신발 발자국 (금색) - main_logo에서 추출한 패턴 기반 -->
+  <g fill="#D4AF37" opacity="0.9">
+    <!-- 발가락 부분 -->
+    <ellipse cx="25" cy="25" rx="8" ry="12"/>
+    <ellipse cx="40" cy="20" rx="9" ry="14"/>
+    <ellipse cx="55" cy="25" rx="8" ry="12"/>
+    <ellipse cx="65" cy="35" rx="6" ry="10"/>
+    <ellipse cx="70" cy="48" rx="5" ry="8"/>
+    
+    <!-- 발바닥 중앙 부분 -->
+    <ellipse cx="45" cy="60" rx="20" ry="25"/>
+    
+    <!-- 발뒤꿈치 부분 -->
+    <ellipse cx="40" cy="95" rx="18" ry="20"/>
+    
+    <!-- 신발 밑창 패턴 -->
+    <rect x="30" y="45" width="3" height="8" rx="1"/>
+    <rect x="35" y="48" width="3" height="6" rx="1"/>
+    <rect x="40" y="50" width="3" height="4" rx="1"/>
+    <rect x="45" y="48" width="3" height="6" rx="1"/>
+    <rect x="50" y="45" width="3" height="8" rx="1"/>
+    
+    <rect x="25" y="65" width="4" height="3" rx="1"/>
+    <rect x="30" y="68" width="4" height="3" rx="1"/>
+    <rect x="35" y="70" width="4" height="3" rx="1"/>
+    <rect x="40" y="72" width="4" height="3" rx="1"/>
+    <rect x="45" y="70" width="4" height="3" rx="1"/>
+    <rect x="50" y="68" width="4" height="3" rx="1"/>
+    <rect x="55" y="65" width="4" height="3" rx="1"/>
+    
+    <rect x="30" y="85" width="3" height="6" rx="1"/>
+    <rect x="35" y="88" width="3" height="4" rx="1"/>
+    <rect x="40" y="90" width="3" height="3" rx="1"/>
+    <rect x="45" y="88" width="3" height="4" rx="1"/>
+    <rect x="50" y="85" width="3" height="6" rx="1"/>
+  </g>
+</svg>

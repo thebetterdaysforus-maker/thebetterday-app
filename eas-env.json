@@ -1,0 +1,1 @@
+{"build": {"development": {"env": {"EXPO_PACKAGE_MANAGER": "npm"}}, "preview": {"env": {"EXPO_PACKAGE_MANAGER": "npm"}}, "production": {"env": {"EXPO_PACKAGE_MANAGER": "npm"}}}}
