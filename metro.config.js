@@ -23,7 +23,7 @@ config.resolver.alias = {
   'fs': false,
   'net': false,
   'tls': false,
-  // @supabase/node-fetch stream 오류 강제 해결
+  // @supabase/node-fetch 완전 차단 및 교체
   '@supabase/node-fetch': require.resolve('cross-fetch'),
   'stream': require.resolve('stream-browserify'),
 };
@@ -45,8 +45,9 @@ config.resolver.blockList = [
   /node_modules\/.*\/tests\/.*/,
   /node_modules\/.*\/\.md$/,
   /node_modules\/.*\/\.cache\/.*/,
-  // @supabase/node-fetch 완전 차단
+  // @supabase/node-fetch 완전 차단 및 fallback 제공
   /node_modules\/@supabase\/node-fetch\/.*/,
+  /@supabase\/node-fetch/,
 ];
 
 // 캐시 및 Babel 설정
