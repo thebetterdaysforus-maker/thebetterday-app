@@ -28,6 +28,7 @@ config.resolver.alias = {
   'tls': false,
   // @supabase/node-fetch 완전 차단 및 교체
   '@supabase/node-fetch': require.resolve('cross-fetch'),
+  'node-fetch': require.resolve('cross-fetch'),
   'stream': require.resolve('stream-browserify'),
 };
 
@@ -37,19 +38,26 @@ config.resolver.unstable_enablePackageExports = true;
 // Optimize bundle loading
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
-// 커스텀 resolveRequest로 특정 모듈을 대체
+// 커스텀 resolveRequest로 특정 모듈을 대체 (더 강력한 차단)
 const originalResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  // @supabase/node-fetch와 ws를 안전한 대체재로 치환
-  if (moduleName === '@supabase/node-fetch' || moduleName === 'node-fetch') {
+  // @supabase/node-fetch 모든 변형 차단
+  if (moduleName.includes('@supabase/node-fetch') || 
+      moduleName.includes('node-fetch') ||
+      moduleName.includes('supabase') && moduleName.includes('fetch')) {
     return context.resolveRequest(context, 'cross-fetch', platform);
   }
-  if (moduleName === 'ws') {
-    // RN 환경에서는 기본 WebSocket 사용 (stream 의존성 없음)
+  // ws 모듈 차단
+  if (moduleName === 'ws' || moduleName.includes('/ws/') || moduleName.includes('\\ws\\')) {
     return {
       type: 'empty',
     };
   }
+  // stream 모듈을 직접 요청하는 경우도 차단
+  if (moduleName === 'stream') {
+    return context.resolveRequest(context, 'readable-stream', platform);
+  }
+  
   return originalResolveRequest
     ? originalResolveRequest(context, moduleName, platform)
     : context.resolveRequest(context, moduleName, platform);
@@ -66,11 +74,14 @@ config.resolver.blockList = [
   /node_modules\/.*\/tests\/.*/,
   /node_modules\/.*\/\.md$/,
   /node_modules\/.*\/\.cache\/.*/,
-  // @supabase/node-fetch 완전 차단 및 fallback 제공
-  /node_modules\/@supabase\/node-fetch\/.*/,
+  // @supabase/node-fetch 완전 차단 - 더 강력한 패턴
+  /node_modules\/@supabase\/node-fetch/,
+  /node_modules.*@supabase.*node-fetch/,
   /@supabase\/node-fetch/,
+  /supabase.*node-fetch/,
   // ws 모듈도 차단 (realtime 경유 stream 오류 방지)
-  /node_modules\/ws\/.*/,
+  /node_modules\/ws/,
+  /node_modules.*\/ws/,
 ];
 
 // 캐시 및 Babel 설정
