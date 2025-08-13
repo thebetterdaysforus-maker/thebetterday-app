@@ -55,8 +55,10 @@
     "lottie-react-native": "7.2.2",
     "nanoid": "^5.1.5",
     "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
     "postcss": "^8.5.6",
     "process": "^0.11.10",
+    "querystring-es3": "^0.2.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.5",
@@ -76,6 +78,7 @@
     "tailwindcss": "^4.1.11",
     "typescript": "^5.8.3",
     "url": "^0.11.4",
+    "util": "^0.12.5",
     "uuid": "^11.1.0",
     "zustand": "^4.5.5"
   }
