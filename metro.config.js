@@ -30,6 +30,8 @@ config.resolver.alias = {
   '@supabase/node-fetch': require.resolve('cross-fetch'),
   'node-fetch': require.resolve('cross-fetch'),
   'stream': require.resolve('stream-browserify'),
+  // date-fns ESM 호환성 문제 해결
+  'date-fns': require.resolve('date-fns'),
 };
 
 // Package Exports 활성화 (SDK 53 기본값) - 조건 우선순위로 제어
