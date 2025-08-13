@@ -25,6 +25,14 @@ config.resolver.alias = {
   'tls': false,
 };
 
+// Global polyfills for node modules
+config.resolver.nodeModulesPaths = ['node_modules'];
+config.resolver.alias = {
+  ...config.resolver.alias,
+  // Force stream resolution for all modules
+  'stream': require.resolve('readable-stream'),
+};
+
 // Optimize bundle loading
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
