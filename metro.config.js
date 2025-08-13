@@ -25,13 +25,8 @@ config.resolver.alias = {
   'tls': false,
 };
 
-// Global polyfills for node modules
-config.resolver.nodeModulesPaths = ['node_modules'];
-config.resolver.alias = {
-  ...config.resolver.alias,
-  // Force stream resolution for all modules
-  'stream': require.resolve('readable-stream'),
-};
+// 패키지 exports 사용 중지 - Metro 0.82+ 호환성 문제 해결
+config.resolver.unstable_enablePackageExports = false;
 
 // Optimize bundle loading
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
