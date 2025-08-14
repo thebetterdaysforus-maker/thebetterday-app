@@ -15,7 +15,7 @@ config.resolver.alias = {
   'https': 'https-browserify',
   'os': 'os-browserify/browser',
   'url': 'url',
-  'crypto': 'crypto-browserify',
+  'crypto': require.resolve('crypto-browserify'),
   'assert': 'assert',
   'buffer': 'buffer',
   'process': 'process/browser',
@@ -30,8 +30,6 @@ config.resolver.alias = {
   '@supabase/node-fetch': require.resolve('cross-fetch'),
   'node-fetch': require.resolve('cross-fetch'),
   'stream': require.resolve('stream-browserify'),
-  // date-fns ESM 호환성 문제 해결 - index.js로 직접 매핑
-  'date-fns': './node_modules/date-fns/index.js',
 };
 
 // Package Exports 비활성화 - date-fns 호환성 문제 해결
@@ -58,6 +56,10 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   // stream 모듈을 직접 요청하는 경우도 차단
   if (moduleName === 'stream') {
     return context.resolveRequest(context, 'readable-stream', platform);
+  }
+  // crypto 모듈 강제 매핑
+  if (moduleName === 'crypto') {
+    return context.resolveRequest(context, 'crypto-browserify', platform);
   }
   
   return originalResolveRequest
