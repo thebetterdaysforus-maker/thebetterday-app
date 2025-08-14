@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { v4 as uuidv4 } from "uuid";
+import { nanoid } from "nanoid";
 import useGoalStore from "../store/goalStore";
 import CustomTimePicker from "../components/CustomTimePicker";
 
@@ -33,7 +33,7 @@ export default function GoalBatchScreen({ route }: any) {
 
   /* ① 임시 목록 상태 - 빈 화면에서 시작 */
   const [tempGoals, setTempGoals] = useState<TempGoal[]>(
-    firstTime ? [{ id: uuidv4(), time: firstTime, title: "" }] : [],
+    firstTime ? [{ id: nanoid(), time: firstTime, title: "" }] : [],
   );
 
   /* 시간 선택 모달 상태 */
@@ -125,7 +125,7 @@ export default function GoalBatchScreen({ route }: any) {
 
     // 새 목표 추가
     const newGoal: TempGoal = {
-      id: uuidv4(),
+      id: nanoid(),
       time: selectedTimeISO,
       title: "",
     };
