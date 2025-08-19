@@ -23,7 +23,7 @@ import {
   cancelAllNotifications,
   safeNotificationCleanup,
 } from "../helpers/notificationScheduler";
-import { unifiedNotificationManager } from "../utils/unifiedNotificationManager";
+import { simpleNotificationManager } from "../utils/simpleNotificationManager";
 
 // 모든 알림 취소 함수 (간단 버전)
 const cancelAllScheduledAlarms = async () => {
@@ -366,11 +366,11 @@ const useGoalStore = create<GoalState>((set, get) => ({
         0,
     });
 
-    // 내일 목표 상세 정보 로그
+    // 내일 수행 목록 상세 정보 로그
     const tomorrowGoals =
       data?.filter((g) => g.target_time.startsWith(today)) || [];
     console.log(
-      "🔍 오늘 목표 상세 (DB에서 가져온 것):",
+      "🔍 오늘 수행 목록 상세 (DB에서 가져온 것):",
       tomorrowGoals.map((g) => ({
         title: g.title,
         time: g.target_time,
@@ -387,57 +387,42 @@ const useGoalStore = create<GoalState>((set, get) => ({
       // 복원된 개별 뱃지들을 상태에 저장
       set((state) => ({ ...state, goalBadges: restoredBadges }));
       
-      console.log(`🏆 개별 목표 뱃지 복원 완료: ${restoredBadges.size}개`);
+      console.log(`🏆 개별 수행 목록 뱃지 복원 완료: ${restoredBadges.size}개`);
 
       // 사용자 알림 설정 확인
       const settingsString = await AsyncStorage.getItem('notificationSettings');
       const settings = settingsString ? JSON.parse(settingsString) : { goalAlarms: true };
       
       if (settings.goalAlarms) {
-        // 🧠 Supabase 기반 스마트 알림 관리: 상태별 처리
+        // 🚫 알림 스케줄링 완전 비활성화 - 즉시 발송 방지
+        // fetchGoals는 데이터 로드용이므로 알림 스케줄링 하지 않음
         const finalGoalsForAlarm = get().goals;
         
-        // 1. 완료/실패한 목표들의 알림 자동 취소 (DB 상태 기반)
+        // 1. 완료/실패한 수행 목록들의 알림 자동 취소만 수행 (DB 상태 기반)
         const completedGoals = finalGoalsForAlarm.filter(
           goal => goal.status === 'success' || goal.status === 'failure'
         );
         
         if (completedGoals.length > 0) {
-          console.log(`🔕 DB에서 완료/실패 상태인 목표 ${completedGoals.length}개 알림 취소 중...`);
+          if (__DEV__) console.log(`🔕 DB에서 완료/실패 상태인 수행 목록 ${completedGoals.length}개 알림 취소 중...`);
           for (const goal of completedGoals) {
             try {
               await cancelGoalAlarm(goal.id);
             } catch (error) {
-              console.log(`⚠️ 목표 "${goal.title}" 알림 취소 실패:`, error);
+              if (__DEV__) console.log(`⚠️ 수행 목록 "${goal.title}" 알림 취소 실패:`, error);
             }
           }
         }
 
-        // 2. pending 상태이면서 미래 시간인 목표들만 필터링
+        // 2. pending 상태 목표 카운트만 확인 (알림 재설정 안함)
         const activeGoals = finalGoalsForAlarm.filter(
           goal => goal.status === 'pending' && new Date(goal.target_time) > new Date()
         );
 
-        console.log(`📊 DB 상태 기반 분석: 완료/실패 ${completedGoals.length}개, 활성 ${activeGoals.length}개`);
+        if (__DEV__) console.log(`📊 DB 상태 기반 분석: 완료/실패 ${completedGoals.length}개, 활성 ${activeGoals.length}개`);
 
-        // ✅ 활성 목표들에 대한 통합 스마트 알림 스케줄링
-        if (activeGoals.length > 0) {
-          console.log(`🔔 ${activeGoals.length}개 활성 목표에 대한 알림 스케줄링 중...`);
-          for (const goal of activeGoals) {
-            try {
-              await unifiedNotificationManager.scheduleGoalNotification(goal.id, goal.title, new Date(goal.target_time));
-            } catch (error) {
-              console.log(`⚠️ 통합 알림 실패, 기존 시스템 사용 - "${goal.title}":`, error);
-              try {
-                await scheduleGoalAlarm(goal.id, goal.title, new Date(goal.target_time));
-              } catch (fallbackError) {
-                console.log(`❌ 목표 "${goal.title}" 모든 알림 스케줄링 실패:`, fallbackError);
-              }
-            }
-          }
-        } else {
-          console.log('📭 스케줄링할 활성 목표가 없음');
-        }
+        // ❌ 목표 로드 시 알림 재설정 금지 - 즉시 발송 방지
+        if (__DEV__) console.log('📭 스케줄링할 활성 목표가 없음');
       } else {
         console.log("🔕 목표 알림이 비활성화되어 있어 스케줄링 건너뜀");
       }
@@ -490,7 +475,7 @@ const useGoalStore = create<GoalState>((set, get) => ({
 
     // 🔥 3시간 제약 검증 (당일 목표인 경우만) - 한국 시간 기준
     const targetDate = new Date(target_time);
-    const nowKorea = getKoreaTime();
+    const nowKoreaValidation = getKoreaTime();
     
     // 한국 시간 기준으로 당일 여부 판단
     const todayKorea = getTodayKorea();
@@ -499,16 +484,16 @@ const useGoalStore = create<GoalState>((set, get) => ({
     
     console.log("🔍 3시간 제약 검증:", {
       목표시간: targetDate.toLocaleString('ko-KR'),
-      현재한국시간: nowKorea.toLocaleString('ko-KR'),
+      현재한국시간: nowKoreaValidation.toLocaleString('ko-KR'),
       목표날짜키: targetDateKorea,
       오늘날짜키: todayKorea,
       당일여부: isToday
     });
     
     if (isToday) {
-      const threeHoursFromNow = new Date(nowKorea.getTime() + 3 * 60 * 60 * 1000);
+      const threeHoursFromNow = new Date(nowKoreaValidation.getTime() + 3 * 60 * 60 * 1000);
       if (targetDate < threeHoursFromNow) {
-        const currentTimeStr = nowKorea.toLocaleTimeString('ko-KR', {
+        const currentTimeStr = nowKoreaValidation.toLocaleTimeString('ko-KR', {
           hour12: true,
           hour: '2-digit',
           minute: '2-digit',
@@ -523,7 +508,7 @@ const useGoalStore = create<GoalState>((set, get) => ({
         throw new Error(`현재 시간(${currentTimeStr})으로부터 3시간 후인 ${minimumTimeStr} 이후 시간만 선택 가능합니다.`);
       }
     } else {
-      console.log("✅ 내일 목표이므로 3시간 제약 건너뜀");
+      console.log("✅ 내일 이후 목표이므로 3시간 제약 건너뜀 - 시간 제약 없음");
     }
 
     // 30분 범위 중복 시간 검증
@@ -584,38 +569,33 @@ const useGoalStore = create<GoalState>((set, get) => ({
       ),
     }));
 
-    // 사용자 display_name 가져오기
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", session.user.id)
-      .single();
-
-    console.log("👤 사용자 프로필 조회 (addGoal):", {
-      userId: session.user.id,
-      profileData,
-      profileError,
-    });
-
-    const userDisplayName = profileData?.display_name || undefined;
-    console.log("📝 알림용 닉네임 (addGoal):", userDisplayName || "없음");
-
-    // 알림 설정 확인 후 스케줄링
+    // 알림 설정 확인 후 스케줄링 - 즉시 발송 방지
     const settingsString = await AsyncStorage.getItem('notificationSettings');
     const settings = settingsString ? JSON.parse(settingsString) : { goalAlarms: true };
     
-    // ✅ 통합 스마트 알림 시스템 활성화
-    if (settings.goalAlarms) {
-      console.log("🔔 목표 알림 시스템 활성화 - 스케줄링 중...");
-      try {
-        // 통합 알림 관리자 사용
-        await unifiedNotificationManager.scheduleGoalNotification(row.id, row.title, new Date(row.target_time), userDisplayName);
-      } catch (error) {
-        console.log("⚠️ 통합 알림 실패, 기존 시스템 사용:", error);
-        await scheduleGoalAlarm(row.id, row.title, new Date(row.target_time), userDisplayName);
-      }
+    // ✅ 한국 시간 기준으로 정확한 알림 스케줄링
+    const targetTime = new Date(row.target_time);
+    const nowKorea = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    const targetKorea = new Date(targetTime.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    
+    if (settings.goalAlarms && targetKorea > nowKorea) {
+      if (__DEV__) console.log("🔔 목표 알림 스케줄링 (한국시간):", {
+        목표: row.title,
+        UTC설정시간: targetTime.toISOString(),
+        한국목표시간: targetKorea.toLocaleString('ko-KR'),
+        한국현재시간: nowKorea.toLocaleString('ko-KR'),
+        미래여부: targetKorea > nowKorea
+      });
+      await simpleNotificationManager.initialize();
+      await simpleNotificationManager.scheduleGoalNotification(row.id, row.title, targetTime);
+      
+      // 디버깅용 - 알림 스케줄링 후 즉시 확인
+      console.log("🔍 목표 추가 후 알림 확인:");
+      setTimeout(() => simpleNotificationManager.getAllScheduledNotifications(), 2000);
+    } else if (targetKorea <= nowKorea) {
+      if (__DEV__) console.log("⏰ 목표 시간이 이미 지나서 알림 설정 안함 (한국시간 기준)");
     } else {
-      console.log("🔕 목표 알림이 비활성화되어 있어 알림 건너뜀");
+      if (__DEV__) console.log("🔕 목표 알림이 비활성화되어 있어 알림 건너뜀");
     }
 
     // 회고 알림 스케줄링
@@ -774,15 +754,27 @@ const useGoalStore = create<GoalState>((set, get) => ({
   updateGoal: async (id: string, data: Partial<Goal>) => {
     // 시간 변경 시 3시간 제약 및 30분 범위 중복 검증
     if (data.target_time) {
-      // 3시간 제약 검증 (당일 목표인 경우)
+      // 3시간 제약 검증 (당일 목표인 경우) - 한국 시간 기준
       const targetDate = new Date(data.target_time);
-      const now = new Date();
-      const isToday = targetDate.toDateString() === now.toDateString();
+      const nowKorea = getKoreaTime();
+      
+      // 한국 시간 기준으로 당일 여부 판단
+      const todayKorea = getTodayKorea();
+      const targetDateKorea = formatDateKorea(targetDate);
+      const isToday = targetDateKorea === todayKorea;
+      
+      console.log("🔍 목표 편집 시 3시간 제약 검증:", {
+        목표시간: targetDate.toLocaleString('ko-KR'),
+        현재한국시간: nowKorea.toLocaleString('ko-KR'),
+        목표날짜키: targetDateKorea,
+        오늘날짜키: todayKorea,
+        당일여부: isToday
+      });
       
       if (isToday) {
-        const threeHoursFromNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+        const threeHoursFromNow = new Date(nowKorea.getTime() + 3 * 60 * 60 * 1000);
         if (targetDate < threeHoursFromNow) {
-          const currentTimeStr = now.toLocaleTimeString('ko-KR', {
+          const currentTimeStr = nowKorea.toLocaleTimeString('ko-KR', {
             hour12: true,
             hour: '2-digit',
             minute: '2-digit',
@@ -796,6 +788,8 @@ const useGoalStore = create<GoalState>((set, get) => ({
           
           throw new Error(`현재 시간(${currentTimeStr})으로부터 3시간 후인 ${minimumTimeStr} 이후 시간만 선택 가능합니다.`);
         }
+      } else {
+        console.log("✅ 내일 이후 목표이므로 3시간 제약 건너뜀 - 시간 제약 없음");
       }
 
       const existingGoals = get().goals;
@@ -899,15 +893,11 @@ const useGoalStore = create<GoalState>((set, get) => ({
         const settingsString = await AsyncStorage.getItem('notificationSettings');
         const settings = settingsString ? JSON.parse(settingsString) : { goalAlarms: true };
         
-        // ✅ 통합 스마트 알림 시스템 활성화 - 목표 수정 시
+        // ✅ 통합 스마트 알림 시스템 활성화 - 목표 수정 시 (단일 알림)
         if (settings.goalAlarms) {
           console.log("🔔 목표 수정으로 알림 재스케줄링");
-          try {
-            await unifiedNotificationManager.scheduleGoalNotification(updatedGoal.id, updatedGoal.title, new Date(updatedGoal.target_time), userDisplayName);
-          } catch (error) {
-            console.log("⚠️ 통합 알림 실패, 기존 시스템 사용:", error);
-            await scheduleGoalAlarm(updatedGoal.id, updatedGoal.title, new Date(updatedGoal.target_time), userDisplayName);
-          }
+          await simpleNotificationManager.initialize();
+          await simpleNotificationManager.scheduleGoalNotification(updatedGoal.id, updatedGoal.title, new Date(updatedGoal.target_time));
         } else {
           console.log("🔕 목표 알림이 비활성화되어 있어 스케줄링 건너뜀");
         }
@@ -1162,8 +1152,9 @@ const useGoalStore = create<GoalState>((set, get) => ({
     const goal = get().goals.find((g) => g.id === id);
     if (!goal) return;
 
-    // 🚫 알림 시스템 완전 비활성화 - 사용자 요청
-    console.log('🚫 목표 체크 알림 취소 시스템 영구 비활성화됨 - 사용자 요청');
+    // ✅ 목표 완료 시 남은 알림 취소 - 사용자 요청
+    console.log('🔕 목표 완료 - 남은 알림 자동 취소 중...');
+    await simpleNotificationManager.cancelGoalNotifications(id);
 
     // 사용자가 직접 체크하는 경우 = 승리
     await get().updateGoal(id, { status: "success" });
@@ -1223,16 +1214,17 @@ const useGoalStore = create<GoalState>((set, get) => ({
       const minutesDiff = timeDiff / (1000 * 60);
       const isToday = goal.target_time.startsWith(today);
 
-      // 오늘 목표: 목표 시간 5분 전부터 체크 가능하고, 5분 후까지 체크 가능
+      // 🎯 "완벽보다 시작" 철학: 24시간 성공 윈도우
+      // 오늘 목표: 목표 시간 5분 전부터 체크 가능하고, 24시간 후까지 체크 가능
       // 내일 목표: 회고 완료 후에는 항상 표시 (체크는 불가능)
       const canCheck =
         goal.status === "pending" &&
         isToday &&
         minutesDiff >= -5 &&
-        minutesDiff <= 5;
+        minutesDiff <= 1440; // 24시간 = 1440분
 
-      if (Math.abs(minutesDiff) <= 10) {
-        // 10분 이내인 목표만 로그
+      if (Math.abs(minutesDiff) <= 1440 || Math.abs(minutesDiff) <= 10) {
+        // 24시간 이내이거나 10분 이내인 목표 로그
         console.log(
           `🔍 체크 가능 여부 - ${goal.title}: ${canCheck} (시간차: ${minutesDiff.toFixed(1)}분, 상태: ${goal.status})`,
         );
@@ -1276,13 +1268,17 @@ const useGoalStore = create<GoalState>((set, get) => ({
       const minutesDiff = timeDiff / (1000 * 60);
       const hoursDiff = timeDiff / (1000 * 60 * 60);
 
-      // 목표 만료 시간 체크
-      // 1. 목표 시간으로부터 5분 초과 시 실패 처리
-      // 2. 24시간 이상 경과한 목표는 무조건 실패 처리 (날짜가 바뀐 경우)
-      const isOverdue = minutesDiff > 5 || hoursDiff > 24;
+      // 🎯 "완벽보다 시작" 철학: 24시간 성공 윈도우
+      // 1. 목표 시간으로부터 24시간(1440분) 초과 시에만 실패 처리
+      // 2. 48시간 이상 경과한 목표는 무조건 실패 처리 (이틀 연속 미완료)
+      const isOverdue = minutesDiff > 1440 || hoursDiff > 48;
       
-      if (isOverdue && hoursDiff > 24) {
-        console.log(`📅 24시간 경과 목표 실패 처리: ${g.title} (${hoursDiff.toFixed(1)}시간 경과)`);
+      if (isOverdue) {
+        if (hoursDiff > 48) {
+          console.log(`📅 48시간 경과 목표 실패 처리: ${g.title} (${hoursDiff.toFixed(1)}시간 경과)`);
+        } else {
+          console.log(`📅 24시간 경과 목표 실패 처리: ${g.title} (${hoursDiff.toFixed(1)}시간 경과)`);
+        }
       }
 
       return isOverdue;
@@ -1414,9 +1410,20 @@ const useGoalStore = create<GoalState>((set, get) => ({
 
       // 회고 시간이 이미 지났고 회고를 아직 작성하지 않았다면 한 번만 알림
       if (retrospectTime <= now) {
+        // 🚨 지연된 회고 알림 발견! 단발성 알림 발송 (한 번만)
+        const alarmSentKey = `retrospect_alarm_sent_${today}`;
+        const alreadySent = await AsyncStorage.getItem(alarmSentKey);
+        
+        if (alreadySent) {
+          console.log("✅ 이미 오늘 회고 알림 발송함 - 중복 방지");
+          return;
+        }
+        
         console.log("🚨 지연된 회고 알림 발견! 단발성 알림 발송");
         try {
           await scheduleRetrospectReminderImmediate();
+          // 발송 기록 저장하여 중복 방지
+          await AsyncStorage.setItem(alarmSentKey, 'sent');
           console.log("✅ 지연된 회고 알림 발송 성공 - 더 이상 반복 안함");
         } catch (error) {
           console.error("❌ 지연된 회고 알림 발송 실패:", error);
@@ -1516,11 +1523,11 @@ const useGoalStore = create<GoalState>((set, get) => ({
   checkAllNotifications: async () => {
     console.log("🔍 현재 설정된 알림 확인 시작");
     try {
-      const notifications = await unifiedNotificationManager.getScheduledNotifications();
-      console.log(`📊 통합 시스템: ${notifications.length}개 알림 예약됨`);
+      await simpleNotificationManager.getAllScheduledNotifications();
+      console.log("📊 단순 알림 시스템으로 알림 확인 완료");
       await getAllScheduledNotifications();
     } catch (error) {
-      console.log("⚠️ 통합 알림 조회 실패, 기존 시스템 사용:", error);
+      console.log("⚠️ 알림 조회 실패, 기존 시스템 사용:", error);
       await getAllScheduledNotifications();
     }
   },
@@ -1528,7 +1535,7 @@ const useGoalStore = create<GoalState>((set, get) => ({
   cancelAllNotifications: async () => {
     console.log("🧹 모든 알림 취소 시작");
     try {
-      await unifiedNotificationManager.cancelAllNotifications();
+      await simpleNotificationManager.cancelAllNotifications();
       console.log("✅ 통합 시스템으로 모든 알림 취소 완료");
     } catch (error) {
       console.log("⚠️ 통합 알림 취소 실패, 기존 시스템 사용:", error);
