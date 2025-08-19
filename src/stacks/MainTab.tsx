@@ -62,7 +62,7 @@ export default function MainTab() {
       <Tab.Screen 
         name="History" 
         component={HistoryStack} 
-        options={{ tabBarLabel: '달력' }}
+        options={{ tabBarLabel: 'DB' }}
       />
       <Tab.Screen 
         name="Network" 
