@@ -110,11 +110,13 @@ export function getTodayKorea(): string {
   const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
   const koreaTime = new Date(utcTime + (koreaOffset * 60000));
   
-  console.log('🕐 getTodayKorea 호출:', {
-    UTC시간: now.toISOString(),
-    한국시간: koreaTime.toISOString(),
-    반환값: koreaTime.toISOString().slice(0, 10)
-  });
+  if (__DEV__) {
+    console.log('🕐 getTodayKorea 호출:', {
+      UTC시간: now.toISOString(),
+      한국시간: koreaTime.toISOString(),
+      반환값: koreaTime.toISOString().slice(0, 10)
+    });
+  }
   
   return koreaTime.toISOString().slice(0, 10);
 }
@@ -130,12 +132,14 @@ export function getTomorrowKorea(): string {
   const koreaTime = new Date(utcTime + (koreaOffset * 60000));
   const tomorrow = new Date(koreaTime.getTime() + 86400000);
   
-  console.log('🕐 getTomorrowKorea 호출:', {
-    UTC시간: now.toISOString(),
-    한국시간: koreaTime.toISOString(),
-    내일: tomorrow.toISOString(),
-    반환값: tomorrow.toISOString().slice(0, 10)
-  });
+  if (__DEV__) {
+    console.log('🕐 getTomorrowKorea 호출:', {
+      UTC시간: now.toISOString(),
+      한국시간: koreaTime.toISOString(),
+      내일: tomorrow.toISOString(),
+      반환값: tomorrow.toISOString().slice(0, 10)
+    });
+  }
   
   return tomorrow.toISOString().slice(0, 10);
 }
