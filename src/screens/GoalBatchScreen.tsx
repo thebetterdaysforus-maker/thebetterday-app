@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Alert,
   Button,
@@ -9,6 +9,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Keyboard,
+  SafeAreaView,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { nanoid } from "nanoid";
@@ -36,6 +38,10 @@ export default function GoalBatchScreen({ route }: any) {
     firstTime ? [{ id: nanoid(), time: firstTime, title: "" }] : [],
   );
 
+  /* 텍스트 입력 상태 관리 */
+  const [isTextInputActive, setIsTextInputActive] = useState(false);
+  const inputRefs = useRef<{ [key: string]: TextInput | null }>({});
+
   /* 시간 선택 모달 상태 */
   const [isTimePickerVisible, setIsTimePickerVisible] = useState(false);
   const [selectedTime, setSelectedTime] = useState<Date>(new Date());
@@ -50,7 +56,7 @@ export default function GoalBatchScreen({ route }: any) {
   /* ③ 행 삭제 - 내일 모드일 때 5개 미만으로 삭제 방지 */
   const removeRow = (id: string) => {
     if (isTomorrowMode && tempGoals.length <= 5) {
-      Alert.alert("삭제 불가", "내일 목표는 최소 5개 이상 유지해야 합니다.");
+      Alert.alert("삭제 불가", "내일 수행 목록은 최소 5개 이상 유지해야 합니다.");
       return;
     }
     setTempGoals((prev) => prev.filter((g) => g.id !== id));
@@ -68,7 +74,9 @@ export default function GoalBatchScreen({ route }: any) {
         })()
       : (() => {
           // 🔥 한국 시간 기준으로 3시간 후 계산
-          const koreaTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+          const koreaTime = new Date(
+            new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
+          );
           const futureTime = new Date(koreaTime.getTime() + 3 * 60 * 60 * 1000); // 3시간 후
           const roundedMinutes = Math.ceil(futureTime.getMinutes() / 30) * 30;
           if (roundedMinutes >= 60) {
@@ -78,12 +86,12 @@ export default function GoalBatchScreen({ route }: any) {
             futureTime.setMinutes(roundedMinutes);
           }
           futureTime.setSeconds(0, 0);
-          
+
           console.log("📅 GoalBatchScreen 기본 시간 계산:", {
-            현재한국시간: koreaTime.toLocaleString('ko-KR'),
-            계산결과: futureTime.toLocaleString('ko-KR')
+            현재한국시간: koreaTime.toLocaleString("ko-KR"),
+            계산결과: futureTime.toLocaleString("ko-KR"),
           });
-          
+
           return futureTime;
         })();
 
@@ -114,7 +122,7 @@ export default function GoalBatchScreen({ route }: any) {
       finalTime.setDate(tomorrow.getDate());
     }
 
-    console.log("⏰ 목표 시간 추가:", {
+    console.log("⏰ 수행 목록 시간 추가:", {
       isTomorrowMode,
       selectedTime: selectedTime.toLocaleString("ko-KR"),
       finalTime: finalTime.toLocaleString("ko-KR"),
@@ -147,7 +155,7 @@ export default function GoalBatchScreen({ route }: any) {
     // 내일 모드일 때는 5개 이상, 오늘 모드일 때는 5개 이상 필요
     const minimumGoals = 5;
     if (tempGoals.length < minimumGoals) {
-      Alert.alert("안내", `목표를 최소 ${minimumGoals}개 이상 작성해 주세요.`);
+      Alert.alert("안내", `수행 목록을 최소 ${minimumGoals}개 이상 작성해 주세요.`);
       return;
     }
     if (tempGoals.some((g) => !g.title.trim())) {
@@ -161,63 +169,63 @@ export default function GoalBatchScreen({ route }: any) {
     console.log("🔍 충돌 검사 시작:", {
       tempGoals: tempGoals.length,
       existingGoals: (goals || []).length,
-      tempGoalTimes: tempGoals.map(g => ({
+      tempGoalTimes: tempGoals.map((g) => ({
         title: g.title,
-        local: new Date(g.time).toLocaleTimeString('ko-KR'),
-        date: new Date(g.time).toLocaleDateString('ko-KR'),
+        local: new Date(g.time).toLocaleTimeString("ko-KR"),
+        date: new Date(g.time).toLocaleDateString("ko-KR"),
         utc: g.time,
-        timestamp: new Date(g.time).getTime()
+        timestamp: new Date(g.time).getTime(),
       })),
-      existingGoalTimes: (goals || []).map(g => ({
+      existingGoalTimes: (goals || []).map((g) => ({
         title: g.title,
-        local: new Date(g.target_time).toLocaleTimeString('ko-KR'),
-        date: new Date(g.target_time).toLocaleDateString('ko-KR'),
+        local: new Date(g.target_time).toLocaleTimeString("ko-KR"),
+        date: new Date(g.target_time).toLocaleDateString("ko-KR"),
         utc: g.target_time,
-        timestamp: new Date(g.target_time).getTime()
-      }))
+        timestamp: new Date(g.target_time).getTime(),
+      })),
     });
 
     for (const tempGoal of tempGoals) {
       const tempTime = new Date(tempGoal.time).getTime();
-      
+
       // 현재 시간대 기준으로 날짜 비교
       const tempDateLocal = new Date(tempGoal.time).toLocaleDateString();
 
       // 같은 날짜의 기존 목표와만 충돌 체크 (현재 시간대 기준)
-      const sameDayGoals = (goals || []).filter(g => {
+      const sameDayGoals = (goals || []).filter((g) => {
         const goalDateLocal = new Date(g.target_time).toLocaleDateString();
         return goalDateLocal === tempDateLocal;
       });
 
-      console.log("📅 같은 날짜 목표 필터링 (현재시간대):", {
+      console.log("📅 같은 날짜 목록 필터링 (현재시간대):", {
         tempGoalTitle: tempGoal.title,
         tempGoalDate: tempDateLocal,
         tempGoalTime: new Date(tempGoal.time).toLocaleString(),
         tempGoalUTC: tempGoal.time,
         sameDayGoalsCount: sameDayGoals.length,
-        sameDayGoals: sameDayGoals.map(g => ({
+        sameDayGoals: sameDayGoals.map((g) => ({
           title: g.title,
           time: new Date(g.target_time).toLocaleString(),
           date: new Date(g.target_time).toLocaleDateString(),
-          utc: g.target_time
-        }))
+          utc: g.target_time,
+        })),
       });
 
       const conflictingExisting = sameDayGoals.find((g) => {
         const goalTime = new Date(g.target_time).getTime();
         const timeDiff = Math.abs(tempTime - goalTime);
         const isConflict = timeDiff < thirtyMinutes;
-        
+
         console.log("⏰ 시간 충돌 검사:", {
           tempGoalTitle: tempGoal.title,
-          tempGoal: new Date(tempGoal.time).toLocaleTimeString('ko-KR'),
+          tempGoal: new Date(tempGoal.time).toLocaleTimeString("ko-KR"),
           existingGoalId: g.id,
           existingGoalTitle: g.title,
-          existingGoal: new Date(g.target_time).toLocaleTimeString('ko-KR'),
+          existingGoal: new Date(g.target_time).toLocaleTimeString("ko-KR"),
           timeDiffMinutes: Math.round(timeDiff / (60 * 1000)),
-          isConflict
+          isConflict,
         });
-        
+
         return isConflict;
       });
 
@@ -231,12 +239,17 @@ export default function GoalBatchScreen({ route }: any) {
           .replace("AM", "오전")
           .replace("PM", "오후");
 
-        console.log("❌ 기존 목표와 충돌 발견 - 저장 차단:", {
+        console.log("❌ 기존 수행 목록과 충돌 발견 - 저장 차단:", {
           tempGoalTitle: tempGoal.title,
-          tempGoalTime: new Date(tempGoal.time).toLocaleTimeString('ko-KR'),
+          tempGoalTime: new Date(tempGoal.time).toLocaleTimeString("ko-KR"),
           conflictingGoalTitle: conflictingExisting.title,
           conflictingGoalTime: conflictTimeStr,
-          timeDiffMinutes: Math.round(Math.abs(tempTime - new Date(conflictingExisting.target_time).getTime()) / (60 * 1000))
+          timeDiffMinutes: Math.round(
+            Math.abs(
+              tempTime - new Date(conflictingExisting.target_time).getTime(),
+            ) /
+              (60 * 1000),
+          ),
         });
         // 내일 모드에서는 30분 제한 알림 표시 안함 (배치 모드는 대부분 내일 모드)
         console.log("✅ 배치 모드 - 30분 제한 알림 건너뜀 (충돌 허용)");
@@ -244,7 +257,13 @@ export default function GoalBatchScreen({ route }: any) {
         console.log("⚠️ 30분 충돌이지만 배치 모드에서 허용:", {
           newGoal: tempGoal.title,
           conflictingGoal: conflictingExisting.title,
-          timeDiff: Math.round(Math.abs(tempTime - new Date(conflictingExisting.target_time).getTime()) / (60 * 1000)) + "분"
+          timeDiff:
+            Math.round(
+              Math.abs(
+                tempTime - new Date(conflictingExisting.target_time).getTime(),
+              ) /
+                (60 * 1000),
+            ) + "분",
         });
       }
 
@@ -254,15 +273,15 @@ export default function GoalBatchScreen({ route }: any) {
         const goalTime = new Date(g.time).getTime();
         const timeDiff = Math.abs(tempTime - goalTime);
         const isConflict = timeDiff < thirtyMinutes;
-        
+
         if (isConflict) {
-          console.log("⚠️ 임시 목표 간 충돌 발견:", {
-            tempGoal1: new Date(tempGoal.time).toLocaleTimeString('ko-KR'),
-            tempGoal2: new Date(g.time).toLocaleTimeString('ko-KR'),
-            timeDiffMinutes: Math.round(timeDiff / (60 * 1000))
+          console.log("⚠️ 임시 목록 간 충돌 발견:", {
+            tempGoal1: new Date(tempGoal.time).toLocaleTimeString("ko-KR"),
+            tempGoal2: new Date(g.time).toLocaleTimeString("ko-KR"),
+            timeDiffMinutes: Math.round(timeDiff / (60 * 1000)),
           });
         }
-        
+
         return isConflict;
       });
 
@@ -276,13 +295,15 @@ export default function GoalBatchScreen({ route }: any) {
           .replace("AM", "오전")
           .replace("PM", "오후");
 
-        console.log("❌ 임시 목표 간 충돌 발견 - 저장 차단");
+        console.log("❌ 임시 목록 간 충돌 발견 - 저장 차단");
         // 배치 모드에서는 30분 제한 알림 표시 안함
-        console.log("✅ 배치 모드 - 임시 목표 30분 제한 알림 건너뜀");
+        console.log("✅ 배치 모드 - 임시 목록 30분 제한 알림 건너뜀");
         // 알림은 표시하지 않지만 로그는 남김
-        console.log("⚠️ 임시 목표 30분 충돌이지만 배치 모드에서 허용:", {
+        console.log("⚠️ 임시 목록 30분 충돌이지만 배치 모드에서 허용:", {
           time: tempTimeStr,
-          conflictingTime: new Date(conflictingTemp.time).toLocaleTimeString('ko-KR')
+          conflictingTime: new Date(conflictingTemp.time).toLocaleTimeString(
+            "ko-KR",
+          ),
         });
       }
     }
@@ -307,7 +328,7 @@ export default function GoalBatchScreen({ route }: any) {
         };
       });
 
-      console.log("🚀 목표 저장:", {
+      console.log("🚀 목록 저장:", {
         isTomorrowMode,
         goalsToSave: goalsToSave.map((g) => ({
           title: g.title,
@@ -317,12 +338,12 @@ export default function GoalBatchScreen({ route }: any) {
       });
 
       await addGoalsBatch(goalsToSave);
-      
+
       // 저장 후 목표 데이터 강제 새로고침
       const { fetchGoals } = useGoalStore.getState();
       await fetchGoals();
-      
-      console.log("🔘 GoalBatch 저장 완료 - 목표 데이터 새로고침 완료");
+
+      console.log("🔘 GoalBatch 저장 완료 - 목록 데이터 새로고침 완료");
 
       console.log("🔘 GoalBatch 저장 완료 - navigation 상태:", {
         navigation: !!navigation,
@@ -353,28 +374,43 @@ export default function GoalBatchScreen({ route }: any) {
 
   /* ──────────────── UI ──────────────── */
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={tempGoals}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <Text style={styles.time}>
-              {new Date(item.time)
-                .toLocaleTimeString("ko-KR", {
-                  hour12: true,
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-                .replace("AM", "오전")
-                .replace("PM", "오후")}
-            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                // 시간 텍스트 클릭 시 해당 입력 필드로 포커스
+                if (inputRefs.current[item.id]) {
+                  inputRefs.current[item.id]?.focus();
+                }
+              }}
+              style={styles.timeContainer}
+            >
+              <Text style={styles.time}>
+                {new Date(item.time)
+                  .toLocaleTimeString("ko-KR", {
+                    hour12: true,
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                  .replace("AM", "오전")
+                  .replace("PM", "오후")}
+              </Text>
+            </TouchableOpacity>
 
             <TextInput
-              placeholder="내일은... 무엇을 하고자 하시나요?"
+              ref={(ref) => {
+                inputRefs.current[item.id] = ref;
+              }}
+              placeholder="무엇을 하고자 하시나요?"
               placeholderTextColor="#999"
               value={item.title}
               onChangeText={(t) => changeTitle(item.id, t)}
+              onFocus={() => setIsTextInputActive(true)}
+              onBlur={() => setIsTextInputActive(false)}
               style={styles.input}
             />
 
@@ -386,7 +422,7 @@ export default function GoalBatchScreen({ route }: any) {
         ListEmptyComponent={
           <View style={{ alignItems: "center", marginTop: 32 }}>
             <Text style={{ textAlign: "center", fontSize: 16, color: "#666" }}>
-              "＋" 버튼을 눌러 목표를 추가하세요
+              "＋" 버튼을 눌러 수행 목록을 추가하세요
             </Text>
             <Text
               style={{
@@ -397,32 +433,52 @@ export default function GoalBatchScreen({ route }: any) {
                 fontWeight: "500",
               }}
             >
-              ⚠️ 목표 간격은 최소 30분 이상 유지해주세요
+              ⚠️ 수행 목록 간격은 최소 30분 이상 유지해주세요
             </Text>
           </View>
         }
       />
 
-      {/* 하단 버튼 */}
-      <View style={styles.bottom}>
-        <Button title="＋ 목표 추가" onPress={openTimePicker} />
-        <Text
-          style={{
-            textAlign: "center",
-            fontSize: 12,
-            color: "#e74c3c",
-            marginTop: 8,
-            marginBottom: 4,
-            fontWeight: "500",
-          }}
-        ></Text>
-        <View style={{ height: 8 }} />
-        <Button
-          title="완료"
-          onPress={onFinish}
-          disabled={tempGoals.length < 5}
-        />
-      </View>
+      {/* 하단 버튼 - 텍스트 입력 중에는 숨김 */}
+      {!isTextInputActive && (
+        <View style={styles.bottom}>
+          <TouchableOpacity
+            style={styles.addGoalButton}
+            onPress={openTimePicker}
+          >
+            <Text style={styles.addGoalButtonText}>수행 목록 추가</Text>
+          </TouchableOpacity>
+
+          <Text
+            style={{
+              textAlign: "center",
+              fontSize: 12,
+              color: "#e74c3c",
+              marginTop: 8,
+              marginBottom: 4,
+              fontWeight: "500",
+            }}
+          ></Text>
+
+          <TouchableOpacity
+            style={[
+              styles.completeButton,
+              tempGoals.length < 5 && styles.disabledCompleteButton,
+            ]}
+            onPress={onFinish}
+            disabled={tempGoals.length < 5}
+          >
+            <Text
+              style={[
+                styles.completeButtonText,
+                tempGoals.length < 5 && styles.disabledCompleteButtonText,
+              ]}
+            >
+              완료
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* 시간 선택 모달 */}
       <Modal
@@ -470,7 +526,7 @@ export default function GoalBatchScreen({ route }: any) {
           />
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -485,11 +541,16 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
   },
+  timeContainer: {
+    width: 80,
+    justifyContent: "center",
+    paddingVertical: 4,
+  },
   time: {
     fontSize: 13,
     fontWeight: "bold",
-    width: 80,
     color: "#333",
+    textAlign: "center",
   },
   input: {
     flex: 1,
@@ -509,10 +570,58 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   bottom: {
-    marginTop: 16,
+    marginTop: 15,
+    marginLeft: 90,
+    marginRight: 90,
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: "#eee",
+    paddingHorizontal: 4,
+  },
+  addGoalButton: {
+    backgroundColor: "#F8F9FA",
+    borderWidth: 2,
+    borderColor: "#7B68EE",
+    borderStyle: "dashed",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  addGoalButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#7B68EE",
+    letterSpacing: 0.3,
+  },
+  completeButton: {
+    backgroundColor: "#7B68EE",
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#7B68EE",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  completeButtonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  disabledCompleteButton: {
+    backgroundColor: "#E0E0E0",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  disabledCompleteButtonText: {
+    color: "#A0A0A0",
   },
   modalContainer: {
     flex: 1,
