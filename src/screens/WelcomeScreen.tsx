@@ -92,6 +92,8 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
             <Text style={styles.guestButtonText}>게스트 모드로 시작하기</Text>
           </TouchableOpacity>
 
+
+
           <View style={styles.footer}>
             <Text style={styles.footerText}>
               게스트로 이용하실 경우 일부 기능은 제한될 수 있습니다.
@@ -175,6 +177,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
   },
+
   footer: {
     alignItems: "center",
   },
