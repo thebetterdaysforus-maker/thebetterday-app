@@ -75,10 +75,12 @@ const getTomorrowString = () => {
     month: "2-digit",
     day: "2-digit",
   });
-  console.log('🔍 getTomorrowString 계산:', { 
-    utcNow: now.toISOString(), 
-    tomorrow: koreaTimeString 
-  });
+  if (__DEV__) {
+    console.log('🔍 getTomorrowString 계산:', { 
+      utcNow: now.toISOString(), 
+      tomorrow: koreaTimeString 
+    });
+  }
   return koreaTimeString;
 };
 
