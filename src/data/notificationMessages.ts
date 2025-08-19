@@ -1,4 +1,6 @@
 // 알림 메시지 데이터 (자체 코드 DB)
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../supabaseClient';
 export interface NotificationMessage {
   id: number;
   type: "general" | "goal";
@@ -30,7 +32,7 @@ export const NOTIFICATION_MESSAGES: NotificationMessage[] = [
   {
     id: 5,
     type: "general",
-    message: "작은 시도가 성공을을 만듭니다.",
+    message: "작은 시도가 성공을 만듭니다.",
     variables: [],
   },
   {
@@ -321,4 +323,59 @@ export const replaceVariables = (
 
   console.log("✅ 변수 치환 완료:", result);
   return result;
+};
+
+// Supabase profiles 테이블에서 display_name 가져오기
+const getUserDisplayName = async (): Promise<string | null> => {
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      if (__DEV__) console.log('🚫 세션 없음 - display_name 조회 불가');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', session.user.id)
+      .single();
+
+    if (error) {
+      if (__DEV__) console.log('❌ display_name 조회 실패:', error.message);
+      return null;
+    }
+
+    if (__DEV__) console.log('✅ display_name 조회 성공:', data?.display_name);
+    return data?.display_name || null;
+    
+  } catch (error) {
+    if (__DEV__) console.error('❌ getUserDisplayName 오류:', error);
+    return null;
+  }
+};
+
+// 개인화된 알림 메시지 생성 함수
+export const getRandomNotificationMessage = async (type: "general" | "goal", goalTitle?: string) => {
+  const filteredMessages = NOTIFICATION_MESSAGES.filter(msg => msg.type === type);
+  const randomMessage = filteredMessages[Math.floor(Math.random() * filteredMessages.length)];
+  
+  if (!randomMessage) {
+    return "목표 달성 시간입니다!";
+  }
+
+  let finalMessage = randomMessage.message;
+
+  // display_name 치환
+  if (randomMessage.variables?.includes('display_name')) {
+    const displayName = await getUserDisplayName();
+    finalMessage = finalMessage.replace(/\{display_name\}/g, displayName || '사용자');
+  }
+
+  // goal 치환 (goal type 메시지용)
+  if (randomMessage.variables?.includes('goal') && goalTitle) {
+    finalMessage = finalMessage.replace(/\{goal\}/g, goalTitle);
+  }
+
+  return finalMessage;
 };
