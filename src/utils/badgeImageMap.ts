@@ -1,8 +1,8 @@
 // 뱃지 이미지 매핑 파일 - 지연 로딩 최적화
 // React Native에서는 동적 require를 지원하지 않으므로 정적 매핑 사용
 
-// 건축 카테고리 뱃지 - 지연 로딩
-const getArchitectureBadges = () => ({
+// 건축 카테고리 뱃지 - 정적 객체로 최적화
+const architectureBadges = {
   1: require('../../assets/badges/건축_1.png'),
   2: require('../../assets/badges/건축_2.png'),
   3: require('../../assets/badges/건축_3.png'),
@@ -15,7 +15,7 @@ const getArchitectureBadges = () => ({
   10: require('../../assets/badges/건축_10.png'),
   11: require('../../assets/badges/건축_11.png'),
   12: require('../../assets/badges/건축_12.png'),
-});
+};
 
 // 나비 카테고리 뱃지
 const butterflyBadges = {
@@ -145,9 +145,9 @@ const publishingBadges = {
   12: require('../../assets/badges/출판_12.png'),
 };
 
-// 전체 뱃지 매핑 - 지연 로딩
+// 전체 뱃지 매핑 - 정적 객체로 최적화
 export const BADGE_IMAGES = {
-  '건축': getArchitectureBadges(),
+  '건축': architectureBadges,
   '나비': butterflyBadges,
   '눈': snowBadges,
   '도자기': ceramicBadges,
@@ -162,7 +162,9 @@ export const BADGE_IMAGES = {
 export function getBadgeImage(category: string, level: number) {
   const categoryBadges = BADGE_IMAGES[category as keyof typeof BADGE_IMAGES];
   if (!categoryBadges) {
-    console.warn(`Unknown badge category: ${category}. Available categories:`, Object.keys(BADGE_IMAGES));
+    if (__DEV__) {
+      console.warn(`Unknown badge category: ${category}. Available categories:`, Object.keys(BADGE_IMAGES));
+    }
     return null;
   }
   
