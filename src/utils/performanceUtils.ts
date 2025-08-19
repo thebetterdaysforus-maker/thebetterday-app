@@ -39,22 +39,22 @@ export const validateAndCleanData = <T>(
   validator: (item: T) => boolean,
   maxItems?: number
 ): T[] => {
-  console.log(`🔍 데이터 검증 시작: ${data.length}개 항목`);
+  if (__DEV__) console.log(`🔍 데이터 검증 시작: ${data.length}개 항목`);
   
   // 유효성 검증
   const validData = data.filter(validator);
   
   if (validData.length !== data.length) {
-    console.warn(`⚠️ 무효한 데이터 ${data.length - validData.length}개 제거됨`);
+    if (__DEV__) console.warn(`⚠️ 무효한 데이터 ${data.length - validData.length}개 제거됨`);
   }
   
   // 메모리 제한 적용
   if (maxItems && validData.length > maxItems) {
-    console.warn(`⚠️ 메모리 제한으로 ${validData.length - maxItems}개 항목 제한`);
+    if (__DEV__) console.warn(`⚠️ 메모리 제한으로 ${validData.length - maxItems}개 항목 제한`);
     return validData.slice(0, maxItems);
   }
   
-  console.log(`✅ 데이터 검증 완료: ${validData.length}개 유효 항목`);
+  if (__DEV__) console.log(`✅ 데이터 검증 완료: ${validData.length}개 유효 항목`);
   return validData;
 };
 
@@ -247,7 +247,7 @@ export const debounce = <T extends (...args: any[]) => any>(
   
   return ((...args: any[]) => {
     clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
+    timeout = setTimeout(() => func(...args), wait) as any;
   }) as T;
 };
 
