@@ -21,7 +21,11 @@ import useGoalStore from "../store/goalStore";
 import useRetrospectStore from "../store/retrospectStore";
 import useCommunityStore from "../store/communityStore";
 import { useFlexibleGoalStore } from "../store/flexibleGoalStore";
-import { SUPPORTED_TIMEZONES, getCurrentTimeZone, setCurrentTimeZone } from "../utils/timeUtils";
+import {
+  SUPPORTED_TIMEZONES,
+  getCurrentTimeZone,
+  setCurrentTimeZone,
+} from "../utils/timeUtils";
 
 interface SettingsScreenProps {
   navigation: any;
@@ -46,7 +50,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     soundEnabled: true,
     vibrationEnabled: true,
   });
-  const [currentTimeZone, setCurrentTimeZoneState] = useState('Asia/Seoul');
+  const [currentTimeZone, setCurrentTimeZoneState] = useState("Asia/Seoul");
   const [showTimeZonePicker, setShowTimeZonePicker] = useState(false);
   const [showSoundModeModal, setShowSoundModeModal] = useState(false);
 
@@ -69,18 +73,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      
-      console.log('🔍 SettingsScreen - 사용자 정보:', {
-        user: user ? {
-          id: user.id,
-          is_anonymous: user.is_anonymous,
-          email: user.email
-        } : null
+
+      console.log("🔍 SettingsScreen - 사용자 정보:", {
+        user: user
+          ? {
+              id: user.id,
+              is_anonymous: user.is_anonymous,
+              email: user.email,
+            }
+          : null,
       });
-      
+
       if (user && !user.is_anonymous) {
         // 정식 사용자 (Supabase 계정)
-        console.log('✅ 정식 사용자 감지 - DB에서 프로필 로드');
+        console.log("✅ 정식 사용자 감지 - DB에서 프로필 로드");
         const { data } = await supabase
           .from("profiles")
           .select("*")
@@ -90,19 +96,19 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         setIsGuestUser(false);
       } else {
         // 게스트 사용자 (익명 사용자)
-        console.log('🎭 게스트 사용자 감지 - 로컬 프로필 로드');
+        console.log("🎭 게스트 사용자 감지 - 로컬 프로필 로드");
         const guestProfile = await AsyncStorage.getItem("guestProfile");
         if (guestProfile) {
           setProfile(JSON.parse(guestProfile));
           setIsGuestUser(true);
         } else {
-          console.log('⚠️ 게스트 프로필이 없음');
+          console.log("⚠️ 게스트 프로필이 없음");
           setIsGuestUser(true); // 게스트로 처리
         }
       }
-      
-      console.log('🔍 SettingsScreen - 최종 상태:', {
-        isGuestUser: user?.is_anonymous !== false
+
+      console.log("🔍 SettingsScreen - 최종 상태:", {
+        isGuestUser: user?.is_anonymous !== false,
       });
     } catch (error) {
       console.error("프로필 로드 실패:", error);
@@ -163,26 +169,26 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   // 사운드 모드 변경
   const changeSoundMode = (mode: string) => {
     let newSettings = { ...notifications };
-    
+
     switch (mode) {
-      case 'sound_vibration':
+      case "sound_vibration":
         newSettings.soundEnabled = true;
         newSettings.vibrationEnabled = true;
         break;
-      case 'sound_only':
+      case "sound_only":
         newSettings.soundEnabled = true;
         newSettings.vibrationEnabled = false;
         break;
-      case 'vibration_only':
+      case "vibration_only":
         newSettings.soundEnabled = false;
         newSettings.vibrationEnabled = true;
         break;
-      case 'silent':
+      case "silent":
         newSettings.soundEnabled = false;
         newSettings.vibrationEnabled = false;
         break;
     }
-    
+
     saveNotificationSettings(newSettings);
     setShowSoundModeModal(false);
   };
@@ -203,7 +209,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       await setCurrentTimeZone(timeZone);
       setCurrentTimeZoneState(timeZone);
       setShowTimeZonePicker(false);
-      Alert.alert("설정 완료", `시간대가 ${SUPPORTED_TIMEZONES[timeZone as keyof typeof SUPPORTED_TIMEZONES].name}로 변경되었습니다.`);
+      Alert.alert(
+        "설정 완료",
+        `시간대가 ${SUPPORTED_TIMEZONES[timeZone as keyof typeof SUPPORTED_TIMEZONES].name}로 변경되었습니다.`,
+      );
     } catch (error) {
       console.error("시간대 설정 실패:", error);
       Alert.alert("오류", "시간대 설정 중 오류가 발생했습니다.");
@@ -220,7 +229,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           try {
             await disableAutoLogin();
             await signOut();
-            // signOut 함수가 session을 null로 설정하므로 
+            // signOut 함수가 session을 null로 설정하므로
             // App.tsx의 조건부 렌더링에 의해 자동으로 AuthStack이 표시됩니다
           } catch (error) {
             console.error("로그아웃 오류:", error);
@@ -232,7 +241,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   };
 
   const handleDeleteAccount = async () => {
-    navigation.navigate('AccountDeletionSurvey');
+    navigation.navigate("AccountDeletionSurvey");
   };
 
   // 전체 데이터 초기화
@@ -548,7 +557,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           <Text style={styles.sectionTitle}>시간대</Text>
           <SettingItem
             title="현재 시간대"
-            subtitle={SUPPORTED_TIMEZONES[currentTimeZone as keyof typeof SUPPORTED_TIMEZONES]?.name || currentTimeZone}
+            subtitle={
+              SUPPORTED_TIMEZONES[
+                currentTimeZone as keyof typeof SUPPORTED_TIMEZONES
+              ]?.name || currentTimeZone
+            }
             icon="time"
             onPress={() => setShowTimeZonePicker(true)}
           />
@@ -557,7 +570,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         {/* 알림 설정 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>알림</Text>
-          
+
           {/* 통합 알림 설정 */}
           <SettingItem
             title="목표 및 회고 알림"
@@ -566,7 +579,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             showArrow={false}
             rightComponent={
               <CustomSwitch
-                value={notifications.goalAlarms && notifications.retrospectReminders}
+                value={
+                  notifications.goalAlarms && notifications.retrospectReminders
+                }
                 onValueChange={(value) =>
                   saveNotificationSettings({
                     ...notifications,
@@ -578,7 +593,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               />
             }
           />
-          
+
           {/* 알림 사운드 모드 선택 */}
           {(notifications.goalAlarms || notifications.retrospectReminders) && (
             <SettingItem
@@ -586,23 +601,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               subtitle={getSoundModeDescription()}
               icon={getSoundModeIcon()}
               onPress={() => setShowSoundModeModal(true)}
-            />
-          )}
-          
-          <View style={styles.subsectionDivider} />
-          {__DEV__ && (
-            <SettingItem
-              title="알림 테스트"
-              subtitle="알림 시스템 작동 확인 (개발자 전용)"
-              icon="flask"
-              onPress={async () => {
-                try {
-                  // dynamic import 제거하고 일반 import 사용
-                  alert('알림 테스트 기능은 개발 중입니다.');
-                } catch (error) {
-                  alert('알림 테스트 실패: ' + String(error));
-                }
-              }}
             />
           )}
         </View>
@@ -690,7 +688,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                 );
               }}
             />
-
           </View>
         )}
 
@@ -733,16 +730,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                   onPress={() => handleTimeZoneChange(timeZone)}
                 >
                   <View>
-                    <Text style={[
-                      styles.timeZoneName,
-                      currentTimeZone === timeZone && styles.selectedText,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.timeZoneName,
+                        currentTimeZone === timeZone && styles.selectedText,
+                      ]}
+                    >
                       {info.name}
                     </Text>
-                    <Text style={[
-                      styles.timeZoneOffset,
-                      currentTimeZone === timeZone && styles.selectedText,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.timeZoneOffset,
+                        currentTimeZone === timeZone && styles.selectedText,
+                      ]}
+                    >
                       UTC {info.offset}
                     </Text>
                   </View>
@@ -778,69 +779,89 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               <TouchableOpacity
                 style={[
                   styles.soundModeItem,
-                  notifications.soundEnabled && notifications.vibrationEnabled && styles.selectedSoundMode,
+                  notifications.soundEnabled &&
+                    notifications.vibrationEnabled &&
+                    styles.selectedSoundMode,
                 ]}
-                onPress={() => changeSoundMode('sound_vibration')}
+                onPress={() => changeSoundMode("sound_vibration")}
               >
                 <Ionicons name="notifications" size={24} color="#7B68EE" />
                 <View style={styles.soundModeText}>
                   <Text style={styles.soundModeTitle}>소리 + 진동</Text>
-                  <Text style={styles.soundModeDescription}>알림음과 진동을 모두 사용</Text>
+                  <Text style={styles.soundModeDescription}>
+                    알림음과 진동을 모두 사용
+                  </Text>
                 </View>
-                {notifications.soundEnabled && notifications.vibrationEnabled && (
-                  <Ionicons name="checkmark" size={20} color="#7B68EE" />
-                )}
+                {notifications.soundEnabled &&
+                  notifications.vibrationEnabled && (
+                    <Ionicons name="checkmark" size={20} color="#7B68EE" />
+                  )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
                   styles.soundModeItem,
-                  notifications.soundEnabled && !notifications.vibrationEnabled && styles.selectedSoundMode,
+                  notifications.soundEnabled &&
+                    !notifications.vibrationEnabled &&
+                    styles.selectedSoundMode,
                 ]}
-                onPress={() => changeSoundMode('sound_only')}
+                onPress={() => changeSoundMode("sound_only")}
               >
                 <Ionicons name="volume-high" size={24} color="#4ECDC4" />
                 <View style={styles.soundModeText}>
                   <Text style={styles.soundModeTitle}>소리만</Text>
-                  <Text style={styles.soundModeDescription}>알림음만 사용, 진동 없음</Text>
+                  <Text style={styles.soundModeDescription}>
+                    알림음만 사용, 진동 없음
+                  </Text>
                 </View>
-                {notifications.soundEnabled && !notifications.vibrationEnabled && (
-                  <Ionicons name="checkmark" size={20} color="#7B68EE" />
-                )}
+                {notifications.soundEnabled &&
+                  !notifications.vibrationEnabled && (
+                    <Ionicons name="checkmark" size={20} color="#7B68EE" />
+                  )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
                   styles.soundModeItem,
-                  !notifications.soundEnabled && notifications.vibrationEnabled && styles.selectedSoundMode,
+                  !notifications.soundEnabled &&
+                    notifications.vibrationEnabled &&
+                    styles.selectedSoundMode,
                 ]}
-                onPress={() => changeSoundMode('vibration_only')}
+                onPress={() => changeSoundMode("vibration_only")}
               >
                 <Ionicons name="phone-portrait" size={24} color="#FF9500" />
                 <View style={styles.soundModeText}>
                   <Text style={styles.soundModeTitle}>진동만</Text>
-                  <Text style={styles.soundModeDescription}>진동만 사용, 소리 없음</Text>
+                  <Text style={styles.soundModeDescription}>
+                    진동만 사용, 소리 없음
+                  </Text>
                 </View>
-                {!notifications.soundEnabled && notifications.vibrationEnabled && (
-                  <Ionicons name="checkmark" size={20} color="#7B68EE" />
-                )}
+                {!notifications.soundEnabled &&
+                  notifications.vibrationEnabled && (
+                    <Ionicons name="checkmark" size={20} color="#7B68EE" />
+                  )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
                   styles.soundModeItem,
-                  !notifications.soundEnabled && !notifications.vibrationEnabled && styles.selectedSoundMode,
+                  !notifications.soundEnabled &&
+                    !notifications.vibrationEnabled &&
+                    styles.selectedSoundMode,
                 ]}
-                onPress={() => changeSoundMode('silent')}
+                onPress={() => changeSoundMode("silent")}
               >
                 <Ionicons name="volume-mute" size={24} color="#999" />
                 <View style={styles.soundModeText}>
                   <Text style={styles.soundModeTitle}>무음</Text>
-                  <Text style={styles.soundModeDescription}>소리와 진동을 모두 비활성화</Text>
+                  <Text style={styles.soundModeDescription}>
+                    소리와 진동을 모두 비활성화
+                  </Text>
                 </View>
-                {!notifications.soundEnabled && !notifications.vibrationEnabled && (
-                  <Ionicons name="checkmark" size={20} color="#7B68EE" />
-                )}
+                {!notifications.soundEnabled &&
+                  !notifications.vibrationEnabled && (
+                    <Ionicons name="checkmark" size={20} color="#7B68EE" />
+                  )}
               </TouchableOpacity>
             </View>
           </View>
@@ -853,46 +874,56 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#f8f9fa",
   },
   scrollView: {
     flex: 1,
+    paddingHorizontal: 16,
   },
   header: {
-    backgroundColor: "#fff",
-    padding: 20,
-    paddingTop: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    backgroundColor: "transparent",
+    paddingVertical: 24,
+    paddingHorizontal: 4,
+    marginBottom: 16,
+    marginTop: 20,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#1a1a1a",
+    letterSpacing: -0.5,
   },
   section: {
-    backgroundColor: "#fff",
-    marginTop: 20,
-    paddingVertical: 10,
+    backgroundColor: "#ffffff",
+    marginBottom: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: "hidden",
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#666",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#8a8a8e",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
     paddingHorizontal: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-    marginBottom: 5,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: "#f8f9fa",
   },
   settingItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 15,
+    paddingVertical: 18,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#f0f0f0",
+    backgroundColor: "#ffffff",
   },
   settingLeft: {
     flexDirection: "row",
@@ -900,137 +931,151 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingText: {
-    marginLeft: 15,
+    marginLeft: 16,
     flex: 1,
   },
   settingTitle: {
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "500",
+    fontSize: 17,
+    color: "#1a1a1a",
+    fontWeight: "600",
+    letterSpacing: -0.2,
   },
   settingSubtitle: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: 15,
+    color: "#8a8a8e",
     marginTop: 2,
+    lineHeight: 20,
   },
   settingRight: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
   },
   footer: {
     alignItems: "center",
-    padding: 5,
-    marginBottom: 10,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   footerLogo: {
     width: 120,
     height: 60,
-    marginBottom: 8,
+    marginBottom: 12,
+    opacity: 0.8,
   },
   footerSubtext: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 0,
+    fontSize: 15,
+    color: "#8a8a8e",
+    textAlign: "center",
+    fontWeight: "500",
+    letterSpacing: 0.3,
   },
   switchContainer: {
-    width: 44,
-    height: 26,
+    width: 52,
+    height: 32,
     justifyContent: "center",
+    alignItems: "center",
   },
   switchTrack: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
+    width: 52,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   switchThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: "#ffffff",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
   },
-  // 모달 스타일
+  // 모달 스타일 개선
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "85%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#e8e8e8",
+    backgroundColor: "#ffffff",
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    letterSpacing: -0.3,
   },
   modalCloseButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "#f8f9fa",
   },
   timeZoneList: {
     maxHeight: 400,
   },
   timeZoneItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomColor: "#f5f5f5",
   },
   selectedTimeZone: {
-    backgroundColor: '#f0f8ff',
+    backgroundColor: "#f0f8ff",
   },
   timeZoneName: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    fontWeight: "500",
+    color: "#333",
   },
   timeZoneOffset: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     marginTop: 2,
   },
   selectedText: {
-    color: '#007AFF',
-  },
-  subsectionDivider: {
-    height: 1,
-    backgroundColor: '#F0F0F0',
-    marginVertical: 12,
-    marginHorizontal: 16,
+    color: "#007AFF",
   },
   // 사운드 모드 모달 스타일
   soundModeList: {
     paddingVertical: 10,
   },
   soundModeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomColor: "#f5f5f5",
   },
   selectedSoundMode: {
-    backgroundColor: '#f0f8ff',
+    backgroundColor: "#f0f8ff",
   },
   soundModeText: {
     flex: 1,
@@ -1038,12 +1083,12 @@ const styles = StyleSheet.create({
   },
   soundModeTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    fontWeight: "500",
+    color: "#333",
   },
   soundModeDescription: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     marginTop: 2,
   },
 });
