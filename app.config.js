@@ -41,7 +41,7 @@ export default ({ config }) => ({
     EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
     EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     eas: {
-      projectId: "thebetterday-mobile-app"
+      projectId: "e0c8ae65-ddfb-46f6-bf01-4dcd170000d5"
     }
   },
   plugins: [
