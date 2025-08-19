@@ -17,7 +17,12 @@ import {
   Modal,
   Image,
   RefreshControl,
+  StatusBar,
 } from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import useGoalStore, { Goal } from "../store/goalStore";
@@ -81,6 +86,9 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
   // useNavigation hook을 사용하여 더 안정적인 navigation 참조
   const navigation = useNavigation() as any;
 
+  // SafeArea 인셋을 가져와서 동적 패딩 적용
+  const insets = useSafeAreaInsets();
+
   // 신규 사용자 첫 방문 체크
   const isFirstTimeUser = route?.params?.firstTimeUser;
 
@@ -99,7 +107,6 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
     getStreakCategory,
     streakBadge,
     goalBadges,
-
   } = useGoalStore();
 
   // fetchGoals 래퍼 함수로 디버깅 및 오류 처리 강화
@@ -172,7 +179,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
     const isFirstTimeUser = params?.firstTimeUser;
 
     if (isFirstTimeUser && navigation) {
-      console.log("🎯 신규 사용자 감지 - 내일 목표 작성으로 자동 이동");
+      console.log("🎯 신규 사용자 감지 - 예정 목표 작성으로 자동 이동");
       // 약간의 지연 후 자동 이동 (UI 안정화)
       const timer = setTimeout(() => {
         navigation.navigate("GoalBatch", { initial: "tomorrow" });
@@ -232,7 +239,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       // Alert.alert("새로고침 완료", "최신 데이터로 업데이트되었습니다");
     } catch (error) {
       console.error("❌ 새로고침 오류:", error);
-      Alert.alert("새로고침 실패", "데이터를 불러오는 중 오류가 발생했습니다");
+      Alert.alert("새로고침 실패", "데이터를 불러오는 중 오류t�� 발생했습니다");
     } finally {
       setRefreshing(false);
     }
@@ -352,7 +359,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
         const goalDate = new Date(x.goal.target_time);
         const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
         const goalDateStr = koreanDate.toISOString().slice(0, 10);
-        // 내일 목표 날짜 확인
+        // 예정 목표 날짜 확인
         return goalDateStr === currentTomorrowKey;
       })
       .sort(
@@ -365,57 +372,42 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
 
     // 회고 상태 확인 완료
 
-    // 내일 목표 상세 정보 처리 완료
+    // 예정 목표 상세 정보 처리 완료
 
     // 전체 목표 데이터 확인 및 날짜 분류 완료
 
     const sections: GoalSection[] = [];
 
-    // 회고 작성 완료 후 워크플로우
+    // 홈 화면 표시 로직 개선: 오늘 또는 예정 목표 중 하나만 표시
     if (todayRetrospectExists) {
-      // 회고 완료 후에는 당일 목표는 History에서만 확인 가능
-      // 내일 목표만 "예정"으로 표시
-      // 회고 완료 후 내일 목표 표시 처리
-
-      // 회고 완료 후에는 오늘 목표도 표시 (체크 불가능, 편집 불가능)
-      if (todayGoals.length > 0) {
-        sections.push({
-          title: "오늘 수행 목록",
-          data: todayGoals,
-        });
-      }
-
+      // 회고 완료 후: 예정 목표 표시
       if (tomorrowGoals.length > 0) {
-        sections.push({ title: "내일 수행 목록", data: tomorrowGoals });
+        sections.push({ title: "수행 예정 목록", data: tomorrowGoals });
       }
-
-      // 필수 목표 확인 (내일 날짜로 변경)
-      const tomorrowFlexible = getTomorrowFlexibleGoals();
-      console.log("🔍 내일 필수 목표:", {
-        개수: tomorrowFlexible.length,
-        목록: tomorrowFlexible.map((g) => g.title),
-      });
-
-      // 필수 목표는 홈 화면에 표시하지 않음 (오른쪽 상단 버튼에만 표시)
+      console.log(
+        "🔍 회고 완료 후 - 수행 예정 목록만 표시:",
+        tomorrowGoals.length,
+      );
     } else {
-      // 회고 작성 전: 당일 목표와 내일 목표 모두 표시
-
-      // 필수 목표는 홈 화면에 표시하지 않음 (오른쪽 상단 버튼에만 표시)
-      const tomorrowFlexible = getTomorrowFlexibleGoals();
-      console.log("🔍 내일 필수 목표 (오른쪽 상단 전용):", {
-        개수: tomorrowFlexible.length,
-        목록: tomorrowFlexible.map((g) => g.title),
-      });
-
+      // 회고 작성 전: 오늘 목표 우선, 없으면 예정 목표 표시
       if (todayGoals.length > 0) {
-        sections.push({ title: "오늘 수행 목록", data: todayGoals });
-      }
-
-      // 내일 목표도 표시 (회고 완료 여부와 상관없이)
-      if (tomorrowGoals.length > 0) {
-        sections.push({ title: "내일 수행 목록", data: tomorrowGoals });
+        sections.push({ title: "수행 목록", data: todayGoals });
+        console.log("🔍 회고 작성 전 -수행 목록 표시:", todayGoals.length);
+      } else if (tomorrowGoals.length > 0) {
+        sections.push({ title: "수행 예정 목록", data: tomorrowGoals });
+        console.log(
+          "🔍 회고 작성 전 - 목록이 없어 예정 목표 표시:",
+          tomorrowGoals.length,
+        );
       }
     }
+
+    // 필수 목표는 홈 화면에 표시하지 않음 (오른쪽 상단 버튼에만 표시)
+    const tomorrowFlexible = getTomorrowFlexibleGoals();
+    console.log("🔍 필수 목표 (오른쪽 상단 전용):", {
+      개수: tomorrowFlexible.length,
+      목록: tomorrowFlexible.map((g) => g.title),
+    });
 
     console.log(
       "🔥 sections 최종 결과:",
@@ -526,7 +518,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       }
       setIsWritingResolution(false);
       setResolutionText("");
-      Alert.alert("성공", "내일의 각오가 저장되었습니다! 💪");
+      Alert.alert("성공", "각오/다짐이 저장되었습니다! 💪");
     } catch (error: any) {
       Alert.alert("오류", error.message || "각오 저장에 실패했습니다.");
     }
@@ -539,7 +531,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
   };
 
   const handleDeleteResolution = () => {
-    Alert.alert("삭제 확인", "정말로 내일의 각오를 삭제하시겠습니까?", [
+    Alert.alert("삭제 확인", "정말로 각오/다짐을 삭제하시겠습니까?", [
       { text: "취소", style: "cancel" },
       {
         text: "삭제",
@@ -604,8 +596,11 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
           {/* 왼쪽: 로고 + 날짜 */}
           <View style={styles.leftHeaderSection}>
             <View style={styles.logoContainer}>
-              <Text style={styles.logoEmoji}>🌟</Text>
-              <Text style={styles.logoText}>Better Day</Text>
+              <Image
+                source={require("../../assets/images/app-logo.png")}
+                style={styles.appLogoImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.dateText}>
               {new Date().toLocaleDateString("ko-KR", {
@@ -699,6 +694,186 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
         </View>
       </View>
 
+      {/* 각오 섹션 - 항상 표시 */}
+      <View style={styles.resolutionAlwaysSection}>
+        <View style={styles.resolutionSectionContainer}>
+          {!myResolution && (
+            <View style={styles.resolutionContainer}>
+              {!isWritingResolution && (
+                <TouchableOpacity
+                  style={styles.resolutionWriteButton}
+                  onPress={handleWriteResolution}
+                >
+                  <Text style={styles.resolutionWriteButtonText}>
+                    나의 각오/다짐 작성하기
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {isWritingResolution && (
+                <View style={styles.resolutionWriteSection}>
+                  <TextInput
+                    style={styles.resolutionTextInput}
+                    placeholder="각오/다짐을 입력해주세요 (최대 100자)"
+                    value={resolutionText}
+                    onChangeText={setResolutionText}
+                    multiline
+                    maxLength={100}
+                    placeholderTextColor="#999"
+                  />
+                  <Text style={styles.resolutionCharCount}>
+                    {resolutionText.length}/100
+                  </Text>
+                  <View style={styles.resolutionWriteActions}>
+                    <TouchableOpacity
+                      style={styles.resolutionCancelButton}
+                      onPress={handleCancelResolution}
+                    >
+                      <Text style={styles.resolutionCancelButtonText}>
+                        취소
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.resolutionSaveButton}
+                      onPress={handleSaveResolution}
+                    >
+                      <Text style={styles.resolutionSaveButtonText}>저장</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* 저장된 각오 표시 (수정/삭제 가능) */}
+          {myResolution && (
+            <View style={styles.resolutionContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.myResolutionCard,
+                  isResolutionExpanded && styles.myResolutionCardExpanded,
+                  // 텍스트 길이에 따른 동적 패딩 조절
+                  {
+                    paddingVertical:
+                      myResolution.content.length > 60
+                        ? 6
+                        : myResolution.content.length > 30
+                          ? 8
+                          : 12,
+                  },
+                ]}
+                onPress={() => setIsResolutionExpanded(!isResolutionExpanded)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.myResolutionContent,
+                    {
+                      textAlign: "left",
+                      // 텍스트 길이에 따른 동적 폰트 크기와 줄 간격
+                      fontSize:
+                        myResolution.content.length > 60
+                          ? 11
+                          : myResolution.content.length > 30
+                            ? 12
+                            : 13,
+                      lineHeight:
+                        myResolution.content.length > 60
+                          ? 14
+                          : myResolution.content.length > 30
+                            ? 15
+                            : 16,
+                    },
+                  ]}
+                  numberOfLines={
+                    myResolution.content.length > 60
+                      ? 3
+                      : myResolution.content.length > 30
+                        ? 2
+                        : 1
+                  }
+                >
+                  {myResolution.content}
+                </Text>
+                {isResolutionExpanded && (
+                  <View style={styles.myResolutionActions}>
+                    <TouchableOpacity
+                      style={styles.resolutionActionButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleWriteResolution();
+                        setIsResolutionExpanded(false);
+                      }}
+                    >
+                      <Text style={styles.resolutionActionText}>수정</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.resolutionActionButton}
+                      onPress={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await deleteMyResolution();
+                          setIsResolutionExpanded(false);
+                          Alert.alert("성공", "각오가 삭제되었습니다.");
+                        } catch (error: any) {
+                          Alert.alert(
+                            "오류",
+                            error.message || "삭제에 실패했습니다.",
+                          );
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.resolutionActionText,
+                          { color: "#FF3B30" },
+                        ]}
+                      >
+                        삭제
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* 수정 모드 시 입력창 표시 */}
+              {isWritingResolution && (
+                <View style={styles.resolutionWriteSection}>
+                  <TextInput
+                    style={styles.resolutionTextInput}
+                    placeholder="각오/다짐을 입력해주세요 (최대 100자)"
+                    value={resolutionText}
+                    onChangeText={setResolutionText}
+                    multiline
+                    maxLength={100}
+                    placeholderTextColor="#999"
+                  />
+                  <Text style={styles.resolutionCharCount}>
+                    {resolutionText.length}/100
+                  </Text>
+                  <View style={styles.resolutionWriteActions}>
+                    <TouchableOpacity
+                      style={styles.resolutionCancelButton}
+                      onPress={handleCancelResolution}
+                    >
+                      <Text style={styles.resolutionCancelButtonText}>
+                        취소
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.resolutionSaveButton}
+                      onPress={handleSaveResolution}
+                    >
+                      <Text style={styles.resolutionSaveButtonText}>저장</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      </View>
+
       {/* 꿈 편집 모달 */}
       {isEditingDream && (
         <View style={styles.dreamEditModal}>
@@ -715,16 +890,16 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
             />
             <View style={styles.dreamButtonContainer}>
               <TouchableOpacity
-                style={[styles.dreamButton, styles.cancelButton]}
+                style={[styles.dreamButtonImproved, styles.dreamCancelButton]}
                 onPress={handleCancelDream}
               >
-                <Text style={styles.cancelButtonText}>취소</Text>
+                <Text style={styles.dreamCancelButtonText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.dreamButton, styles.saveButton]}
+                style={[styles.dreamButtonImproved, styles.dreamSaveButton]}
                 onPress={handleSaveDream}
               >
-                <Text style={styles.saveButtonText}>저장</Text>
+                <Text style={styles.dreamSaveButtonText}>저장</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -760,7 +935,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
 
               // 🔥 스마트 목표 추가 로직: 기존 목표와 같은 날짜로 추가
               try {
-                // 내일 목표 개수 확인
+                // 예정 목표 개수 확인
                 const tomorrowGoals = allGoalsWithCheck.filter((x) => {
                   const goalDate = new Date(x.goal.target_time);
                   const koreanDate = new Date(
@@ -776,28 +951,27 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                 console.log("🎯 스마트 목표 추가 로직:", {
                   tomorrowGoalsCount: tomorrowGoals.length,
                   todayGoalsCount: todayCount,
-                  decision:
-                    tomorrowGoals.length > 0 ? "내일에 추가" : "오늘에 추가",
+                  decision: tomorrowGoals.length > 0 ? "예정에 추가" : "추가",
                 });
 
-                // 내일 목표가 있으면 내일에 추가, 없으면 오늘에 추가
+                // 예정 목표가 있으면 내일에 추가, 없으면 오늘에 추가
                 if (tomorrowGoals.length > 0) {
                   // 내일 목표가 있으면 내일에 추가
                   if (tomorrowGoals.length < 5) {
-                    console.log("🚀 내일 목표 일괄 작성 - GoalBatch로 이동");
+                    console.log("🚀 예정 목표 일괄 작성 - GoalBatch로 이동");
                     navigation.navigate("GoalBatch", { initial: "tomorrow" });
                   } else {
-                    console.log("🚀 내일 개별 목표 추가 - TimeSelect로 이동");
+                    console.log("🚀 예정 개별 목표 추가 - TimeSelect로 이동");
                     navigation.navigate("TimeSelect", { initial: "tomorrow" });
                   }
                 } else {
                   // 내일 목표가 없으면 오늘에 추가 (또는 내일 일괄 작성)
                   if (todayCount === 0) {
-                    console.log("🚀 내일 목표 일괄 작성 - GoalBatch로 이동");
+                    console.log("🚀 예정 목표 일괄 작성 - GoalBatch로 이동");
                     navigation.navigate("GoalBatch", { initial: "tomorrow" });
                   } else {
                     console.log(
-                      "🚀 오늘 목표 추가 (3시간 제약) - TimeSelect로 이동",
+                      "🚀 수행 목록 추가 (3시간 제약) - TimeSelect로 이동",
                     );
                     navigation.navigate("TimeSelect", { initial: "today" });
                   }
@@ -815,7 +989,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       {/* 모든 목표 완료 시 회고 작성 버튼 */}
       {allDoneToday && !todayRetrospectExists && (
         <TouchableOpacity
-          style={styles.retrospectCompactButton}
+          style={styles.retrospectCompactButtonStyled}
           onPress={() => {
             console.log("🔘 회고 버튼 클릭 - navigation 상태:", {
               navigation: !!navigation,
@@ -842,19 +1016,17 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
             }
           }}
         >
-          <Text style={styles.retrospectCompactButtonText}>
-            📝 오늘 회고 작성
-          </Text>
+          <Text style={styles.retrospectCompactButtonText}>📝 회고 작성</Text>
         </TouchableOpacity>
       )}
 
-      {/* 회고 작성 후: 내일 목표 작성 */}
+      {/* 회고 작성 후: 예정 목표 작성 */}
       {todayRetrospectExists && (
         <View style={styles.centerPlusContainer}>
           <TouchableOpacity
             style={styles.plusButton}
             onPress={() => {
-              console.log("🔘 내일 목표 플러스 버튼 클릭 - navigation 상태:", {
+              console.log("🔘 예정 목표 플러스 버튼 클릭 - navigation 상태:", {
                 navigation: !!navigation,
                 navigate: !!navigation?.navigate,
               });
@@ -873,28 +1045,28 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
               });
 
               if (!navigation) {
-                console.error("❌ 내일 목표 버튼: navigation이 null입니다!");
+                console.error("❌ 예정 목표 버튼: navigation이 null입니다!");
                 return;
               }
 
               if (!navigation.navigate) {
                 console.error(
-                  "❌ 내일 목표 버튼: navigation.navigate가 존재하지 않습니다!",
+                  "❌ 예정 목표 버튼: navigation.navigate가 존재하지 않습니다!",
                 );
                 return;
               }
 
               try {
                 if (tomorrowGoals.length < 5) {
-                  console.log("🚀 내일 목표 - GoalBatch로 이동");
+                  console.log("🚀 예정 목표 - GoalBatch로 이동");
                   navigation.navigate("GoalBatch", { initial: "tomorrow" });
                 } else {
-                  console.log("🚀 내일 목표 - TimeSelect로 이동");
+                  console.log("🚀 예정 목표 - TimeSelect로 이동");
                   navigation.navigate("TimeSelect", { initial: "tomorrow" });
                 }
               } catch (error) {
                 console.error(
-                  "❌ 내일 목표 버튼 navigate 호출 중 오류:",
+                  "❌ 예정 목표 버튼 navigate 호출 중 오류:",
                   error,
                 );
               }
@@ -1064,200 +1236,26 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
     >;
   }) => (
     <View>
-      {/* "오늘" 또는 "내일 수행 목록" 섹션에서는 검은색 영역에 제목과 각오 통합 */}
-      {(section.title === "오늘" ||
-        section.title === "오늘 수행 목록" ||
-        section.title === "내일 수행 목록") && (
+      {/* "오늘" 또는 "수행 예정 목록" 섹션에서는 검은색 영역에 제목과 각오 통합 */}
+      {(section.title === "" ||
+        section.title === "수행 목록" ||
+        section.title === "수행 예정 목록") && (
         <View style={styles.todaySection}>
           {/* 수행 목록 제목 */}
           <Text style={styles.todaySectionTitle}>
-            {section.title === "내일 수행 목록"
-              ? "내일 수행 목록"
-              : "오늘 수행 목록"}
+            {section.title === "수행 예정 목록"
+              ? "수행 예정 목록"
+              : "수행 목록"}
           </Text>
-
-          {/* 각오 영역 - 각오가 저장되어 있으면 작성 UI 완전히 숨김 */}
-          {!myResolution && (
-            <View style={styles.resolutionContainer}>
-              {!isWritingResolution && (
-                <TouchableOpacity
-                  style={styles.resolutionWriteButton}
-                  onPress={handleWriteResolution}
-                >
-                  <Text style={styles.resolutionWriteButtonText}>
-                    💪 내일의 각오 작성하기
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {isWritingResolution && (
-                <View style={styles.resolutionWriteSection}>
-                  <TextInput
-                    style={styles.resolutionTextInput}
-                    placeholder="내일의 각오를 입력해주세요 (최대 100자)"
-                    value={resolutionText}
-                    onChangeText={setResolutionText}
-                    multiline
-                    maxLength={100}
-                    placeholderTextColor="#999"
-                  />
-                  <Text style={styles.resolutionCharCount}>
-                    {resolutionText.length}/100
-                  </Text>
-                  <View style={styles.resolutionWriteActions}>
-                    <TouchableOpacity
-                      style={styles.resolutionCancelButton}
-                      onPress={handleCancelResolution}
-                    >
-                      <Text style={styles.resolutionCancelButtonText}>
-                        취소
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.resolutionSaveButton}
-                      onPress={handleSaveResolution}
-                    >
-                      <Text style={styles.resolutionSaveButtonText}>저장</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* 저장된 각오 표시 (수정/삭제 가능) */}
-          {myResolution && (
-            <View style={styles.resolutionContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.myResolutionCard,
-                  isResolutionExpanded && styles.myResolutionCardExpanded,
-                  // 텍스트 길이에 따른 동적 패딩 조절
-                  {
-                    paddingVertical:
-                      myResolution.content.length > 60
-                        ? 6
-                        : myResolution.content.length > 30
-                          ? 8
-                          : 12,
-                  },
-                ]}
-                onPress={() => setIsResolutionExpanded(!isResolutionExpanded)}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.myResolutionContent,
-                    {
-                      textAlign: "left",
-                      // 텍스트 길이에 따른 동적 폰트 크기와 줄 간격
-                      fontSize:
-                        myResolution.content.length > 60
-                          ? 11
-                          : myResolution.content.length > 30
-                            ? 12
-                            : 13,
-                      lineHeight:
-                        myResolution.content.length > 60
-                          ? 14
-                          : myResolution.content.length > 30
-                            ? 15
-                            : 16,
-                    },
-                  ]}
-                  numberOfLines={
-                    myResolution.content.length > 60
-                      ? 3
-                      : myResolution.content.length > 30
-                        ? 2
-                        : 1
-                  }
-                >
-                  {myResolution.content}
-                </Text>
-                {isResolutionExpanded && (
-                  <View style={styles.myResolutionActions}>
-                    <TouchableOpacity
-                      style={styles.resolutionActionButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleWriteResolution();
-                        setIsResolutionExpanded(false);
-                      }}
-                    >
-                      <Text style={styles.resolutionActionText}>수정</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.resolutionActionButton}
-                      onPress={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          await deleteMyResolution();
-                          setIsResolutionExpanded(false);
-                          Alert.alert("성공", "각오가 삭제되었습니다.");
-                        } catch (error: any) {
-                          Alert.alert(
-                            "오류",
-                            error.message || "삭제에 실패했습니다.",
-                          );
-                        }
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.resolutionActionText,
-                          { color: "#FF3B30" },
-                        ]}
-                      >
-                        삭제
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* 수정 모드 시 입력창 표시 */}
-              {isWritingResolution && (
-                <View style={styles.resolutionWriteSection}>
-                  <TextInput
-                    style={styles.resolutionTextInput}
-                    placeholder="내일의 각오를 입력해주세요 (최대 100자)"
-                    value={resolutionText}
-                    onChangeText={setResolutionText}
-                    multiline
-                    maxLength={100}
-                    placeholderTextColor="#999"
-                  />
-                  <Text style={styles.resolutionCharCount}>
-                    {resolutionText.length}/100
-                  </Text>
-                  <View style={styles.resolutionWriteActions}>
-                    <TouchableOpacity
-                      style={styles.resolutionCancelButton}
-                      onPress={handleCancelResolution}
-                    >
-                      <Text style={styles.resolutionCancelButtonText}>
-                        취소
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.resolutionSaveButton}
-                      onPress={handleSaveResolution}
-                    >
-                      <Text style={styles.resolutionSaveButtonText}>저장</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
         </View>
       )}
 
       {/* 일반 섹션 헤더 (내일/커뮤니티 제외) */}
-      {section.title !== "내일" &&
+      {section.title !== "예정" &&
         section.title !== "커뮤니티" &&
-        section.title !== "내일 수행 목록" && (
+        section.title !== "" &&
+        section.title !== "수행 목록" &&
+        section.title !== "수행 예정 목록" && (
           <View style={styles.upcomingSection}>
             <Text style={styles.upcomingSectionTitle}>{section.title}</Text>
           </View>
@@ -1267,7 +1265,8 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
 
   /* ───── 렌더 ───── */
   return (
-    <>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#1C1C1E" }}>
+      <StatusBar barStyle="light-content" backgroundColor="#1C1C1E" />
       <SectionList
         style={{ flex: 1, backgroundColor: "#1C1C1E" }}
         sections={sections}
@@ -1287,7 +1286,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>목표를 시작해보세요! 🎯</Text>
             <Text style={styles.emptySubtitle}>
-              하루 5개의 목표로 작은 성취를 쌓아가세요
+              매일 5가지 이상의 성취를 쌓아갑시다!
             </Text>
             <Text style={styles.emptyHint}>
               "+" 버튼을 눌러 수행 목록을 추가해보세요
@@ -1344,20 +1343,19 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
           </View>
         </View>
       </Modal>
-
-
-    </>
+    </SafeAreaView>
   );
 }
 
 /* ───── 스타일 ───── */
 const styles = StyleSheet.create({
-  // 상단 헤더 섹션 (흰색 배경)
+  // 상단 헤더 섹션 (흰색 배경) - SafeArea 적용
   topHeaderSection: {
     backgroundColor: "#FFFFFF",
-    paddingTop: 50, // 상태바 여백
+    paddingTop: 20, // SafeAreaView 내부에서는 추가 패딩 최소화
     paddingHorizontal: 8,
-    paddingBottom: 30,
+    paddingBottom: 20,
+    borderRadius: 12,
   },
 
   topHeaderContent: {
@@ -1375,6 +1373,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 5,
+  },
+  appLogoImage: {
+    width: 120,
+    height: 30,
   },
   logoEmoji: {
     fontSize: 20,
@@ -1457,24 +1459,44 @@ const styles = StyleSheet.create({
     width: "100%",
   },
 
-  // 검은색 섹션 스타일 제거 (더 이상 사용 안 함)
+  // 각오 섹션 - 항상 표시되는 독립 영역
+  resolutionAlwaysSection: {
+    backgroundColor: "#1C1C1E",
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    marginBottom: 5,
+  },
+
+  // 각오 섹션 컨테이너 - 적절한 패딩 적용
+  resolutionSectionContainer: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    marginBottom: 0,
+  },
 
   resolutionWriteButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
     backgroundColor: "#2C2C2E",
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 2,
-    borderColor: "#3A3A3C",
+    borderColor: "#4A4A4C",
     borderStyle: "dashed",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 
   resolutionWriteButtonText: {
-    fontSize: 15,
+    fontSize: 16,
     color: "#FFFFFF",
-    fontWeight: "600",
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
 
   myResolutionCard: {
@@ -1589,10 +1611,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
+    padding: 15,
     backgroundColor: "#34C759",
     borderRadius: 12,
-    marginTop: 12,
+    marginTop: 30,
     borderWidth: 2,
     borderColor: "#30D158",
   },
@@ -1604,21 +1626,9 @@ const styles = StyleSheet.create({
   },
 
   // 컴팩트 회고 작성 버튼 (하단)
-  retrospectCompactButton: {
-    backgroundColor: "transparent",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "center",
-  },
 
-  retrospectCompactButtonText: {
-    fontSize: 16,
-    color: "#E67E22",
-    fontWeight: "600",
-  },
+
+
 
   dreamEditModal: {
     position: "absolute",
@@ -1638,23 +1648,6 @@ const styles = StyleSheet.create({
     padding: 25,
     width: "95%",
     maxWidth: 380,
-  },
-
-  centerPlusContainer: {
-    alignItems: "center",
-    paddingVertical: 30,
-    backgroundColor: "#1C1C1E",
-  },
-
-  plusButton: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
 
   headerBox: {
@@ -1715,13 +1708,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 8,
   },
-  dreamButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 4,
-    minWidth: 50,
-    alignItems: "center",
-  },
+
   saveButton: {
     backgroundColor: "#7BA428",
   },
@@ -1744,18 +1731,18 @@ const styles = StyleSheet.create({
   todaySection: {
     backgroundColor: "#1C1C1E",
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 16,
+    paddingTop: 5,
+    paddingBottom: 10,
   },
 
   todaySectionTitle: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#FFFFFF",
-    marginBottom: 20,
+    marginBottom: 15,
   },
 
-  // 내일 섹션
+  // 예정 섹션
   upcomingSection: {
     backgroundColor: "#1C1C1E",
     paddingHorizontal: 20,
@@ -2103,5 +2090,139 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 
+  // 플러스 버튼 개선
+  centerPlusContainer: {
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 15,
+  },
 
+  plusButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#7B68EE",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#7B68EE",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  // 회고 버튼 개선
+  retrospectCompactButtonStyled: {
+    paddingVertical: 20,
+    paddingHorizontal: 40,
+    borderRadius: 28,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+
+  retrospectCompactButtonText: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+
+  // 꿈 편집 버튼들 개선
+  dreamButtonImproved: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    flex: 1,
+    marginHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  dreamSaveButton: {
+    backgroundColor: "#7B68EE",
+  },
+
+  dreamSaveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+
+  dreamCancelButton: {
+    backgroundColor: "#F8F8F8",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+
+  dreamCancelButtonText: {
+    color: "#666666",
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+
+  dreamButtonContainerDuplicate: {
+    flexDirection: "row",
+    marginTop: 16,
+    paddingHorizontal: 12,
+  },
+
+  // 각오 작성 액션 버튼들 개선
+  resolutionWriteActionsDuplicate: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+    gap: 12,
+  },
+
+  resolutionCancelButtonStyled: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: "#2C2C2E",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#4A4A4C",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  resolutionCancelButtonTextStyled: {
+    color: "#CCCCCC",
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+
+  resolutionSaveButtonStyled: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: "#7B68EE",
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#7B68EE",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
+  resolutionSaveButtonTextStyled: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
 });
