@@ -290,8 +290,8 @@ export default function DayDetailScreen({ route }: any) {
             day: "2-digit",
           });
 
-          if (date === todayKey) return "오늘의 정시 목표";
-          if (date === tomorrowKey) return "예정된 정시 목표";
+          if (date === todayKey) return "오늘 수행 목록";
+          if (date === tomorrowKey) return "수행 목록";
 
           // 과거 날짜
           const targetDate = new Date(date);
@@ -378,8 +378,8 @@ export default function DayDetailScreen({ route }: any) {
             day: "2-digit",
           });
 
-          if (date === tomorrowKey) return "내일 필수 목표";
-          if (date === todayKey) return "오늘 필수 목표";
+          if (date === tomorrowKey) return "필수 목표";
+          if (date === todayKey) return "필수 목표";
 
           // 과거 날짜
           const targetDate = new Date(date);
@@ -442,6 +442,7 @@ export default function DayDetailScreen({ route }: any) {
 const s = StyleSheet.create({
   wrap: { padding: 16 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
+
   headDate: { fontSize: 24, fontWeight: "bold", marginBottom: 16 },
   card: {
     backgroundColor: "#f9f9f9",
