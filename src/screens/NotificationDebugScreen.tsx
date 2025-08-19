@@ -4,10 +4,17 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NotificationStatusCard } from '../components/NotificationStatusCard';
-import { unifiedNotificationManager } from '../utils/unifiedNotificationManager';
+import { simpleNotificationManager } from '../utils/simpleNotificationManager';
 import useGoalStore from '../store/goalStore';
 
-export default function NotificationDebugScreen({ navigation }: any) {
+interface NotificationDebugScreenProps {
+  navigation: {
+    goBack: () => void;
+    navigate: (screen: string) => void;
+  };
+}
+
+export default function NotificationDebugScreen({ navigation }: NotificationDebugScreenProps) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const { checkAllNotifications, cancelAllNotifications } = useGoalStore();
 
@@ -17,8 +24,8 @@ export default function NotificationDebugScreen({ navigation }: any) {
 
   const loadNotifications = async () => {
     try {
-      const scheduled = await unifiedNotificationManager.getScheduledNotifications();
-      setNotifications(scheduled);
+      await simpleNotificationManager.getAllScheduledNotifications();
+      setNotifications([]); // 단순 시스템에서는 목록 표시 간소화
     } catch (error) {
       console.error('알림 로드 실패:', error);
     }
@@ -27,7 +34,8 @@ export default function NotificationDebugScreen({ navigation }: any) {
   const handleTestBasicNotification = async () => {
     try {
       const testTime = new Date(Date.now() + 5000); // 5초 후
-      await unifiedNotificationManager.scheduleGoalNotification(
+      await simpleNotificationManager.initialize();
+      await simpleNotificationManager.scheduleGoalNotification(
         'test-basic',
         '기본 테스트 알림',
         testTime
@@ -42,12 +50,13 @@ export default function NotificationDebugScreen({ navigation }: any) {
   const handleTestEnhancedNotification = async () => {
     try {
       const testTime = new Date(Date.now() + 10000); // 10초 후
-      await unifiedNotificationManager.scheduleGoalNotification(
+      await simpleNotificationManager.initialize();
+      await simpleNotificationManager.scheduleGoalNotification(
         'test-enhanced',
-        '강화된 테스트 알림',
+        '단순 테스트 알림',
         testTime
       );
-      Alert.alert('성공', '10초 후부터 3단계 테스트 알림이 발송됩니다.');
+      Alert.alert('성공', '10초 후 단순 테스트 알림이 발송됩니다.');
       setTimeout(loadNotifications, 1000);
     } catch (error) {
       Alert.alert('실패', '강화된 알림 테스트 실패: ' + String(error));
