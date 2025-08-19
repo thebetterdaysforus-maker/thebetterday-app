@@ -1,9 +1,15 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState, useRef, ErrorInfo } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, TextInput, Platform, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import * as Font from 'expo-font';
+import {
+  NotoSansKR_400Regular,
+  NotoSansKR_500Medium,
+  NotoSansKR_700Bold,
+} from '@expo-google-fonts/noto-sans-kr';
 import { supabase } from './src/supabaseClient';
 import { checkSupabaseConnection } from './src/utils/supabaseHealthCheck';
 import { logAPKEnvironment, testNetworkConnectivity, APKErrorReporter } from './src/utils/apkDebugger';
@@ -62,6 +68,7 @@ function MainApp() {
   const goalStoreState = useGoalStore();
   const [loading, setLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
   const [supabaseStatus, setSupabaseStatus] = useState<{
     isConnected: boolean;
     canAuth: boolean;
@@ -130,10 +137,45 @@ function MainApp() {
   // 🚫 알림 시스템 완전 비활성화 - 사용자 요청
   // 알림 클릭 처리 시스템 영구 비활성화됨
 
+  // 폰트 로드
+  useEffect(() => {
+    const loadFonts = async () => {
+      try {
+        await Font.loadAsync({
+          'NotoSansKR-Regular': NotoSansKR_400Regular,
+          'NotoSansKR-Medium': NotoSansKR_500Medium,
+          'NotoSansKR-Bold': NotoSansKR_700Bold,
+        });
+        
+        // 글로벌 폰트 설정
+        // TypeScript 호환성을 위해 any로 타입 단언
+        const TextComponent = Text as any;
+        const TextInputComponent = TextInput as any;
+        
+        if (!TextComponent.defaultProps) {
+          TextComponent.defaultProps = {};
+        }
+        TextComponent.defaultProps.style = { fontFamily: 'NotoSansKR-Regular' };
+        
+        if (!TextInputComponent.defaultProps) {
+          TextInputComponent.defaultProps = {};
+        }
+        TextInputComponent.defaultProps.style = { fontFamily: 'NotoSansKR-Regular' };
+        
+        setFontsLoaded(true);
+        if (__DEV__) console.log('✅ Noto Sans KR 폰트 로드 완료');
+      } catch (error) {
+        console.error('❌ 폰트 로드 실패:', error);
+        setFontsLoaded(true); // 폰트 로드 실패해도 앱은 계속 실행
+      }
+    };
+    loadFonts();
+  }, []);
+
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        console.log('🚀 APK 앱 초기화 시작...');
+        if (__DEV__) console.log('🚀 APK 앱 초기화 시작...');
         
         // APK 환경 정보 로깅
         logAPKEnvironment();
@@ -146,7 +188,7 @@ function MainApp() {
         
         // 알림 시스템 정상 작동 - 목표 알림과 회고 알림 활성화 (APK 안전 처리)
         try {
-          console.log("🔔 알림 시스템 정상 작동 중");
+          if (__DEV__) console.log("🔔 알림 시스템 정상 작동 중");
         } catch (notificationError) {
           APKErrorReporter.report(notificationError, 'notification_system');
           console.log('⚠️ 알림 시스템 건너뜀:', notificationError);
@@ -162,7 +204,7 @@ function MainApp() {
         
         // Supabase 연결 상태 확인 (APK 안전 처리)
         try {
-          console.log('🔍 Supabase 연결 상태 확인 중...');
+          if (__DEV__) console.log('🔍 Supabase 연결 상태 확인 중...');
           
           // APK 환경에서 타임아웃 더 짧게 설정
           const timeoutPromise = new Promise((_, reject) => {
@@ -184,15 +226,15 @@ function MainApp() {
             return;
           }
           
-          console.log('✅ Supabase 연결 성공');
+          if (__DEV__) console.log('✅ Supabase 연결 성공');
           
           // 세션 확인 및 자동 로그인 시도
           const { data: { session } } = await supabase.auth.getSession();
-          console.log('🔍 현재 세션 상태:', session ? '있음' : '없음');
+          if (__DEV__) console.log('🔍 현재 세션 상태:', session ? '있음' : '없음');
           
           if (session) {
             // 기존 세션이 있으면 자동 로그인 활성화
-            console.log('✅ 기존 세션 발견 - 자동 로그인 활성화');
+            if (__DEV__) console.log('✅ 기존 세션 발견 - 자동 로그인 활성화');
             try {
               await enableAutoLogin();
             } catch (autoLoginError) {
@@ -248,11 +290,20 @@ function MainApp() {
 
   // 스플래시 스크린 비활성화됨
 
-  if (loading) {
+  if (loading || !fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>🌟 The Better Day</Text>
-        <Text style={styles.loadingSubtext}>로딩 중...</Text>
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('./assets/footprint-logo.png')} 
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.loadingText}>The Better Day</Text>
+        </View>
+        <Text style={styles.loadingSubtext}>
+          {!fontsLoaded ? '폰트 로딩 중...' : '로딩 중...'}
+        </Text>
         {initError && (
           <Text style={styles.errorText}>{initError}</Text>
         )}
@@ -263,12 +314,14 @@ function MainApp() {
     );
   }
 
-  console.log('🔍 App.tsx 렌더링 상태:', {
-    session: session ? '있음' : '없음',
-    profile: profile ? '있음' : '없음',
-    isAnonymous: session?.user?.is_anonymous || false,
-    userId: session?.user?.id?.slice(0, 8) || 'N/A'
-  });
+  if (__DEV__) {
+    console.log('🔍 App.tsx 렌더링 상태:', {
+      session: session ? '있음' : '없음',
+      profile: profile ? '있음' : '없음',
+      isAnonymous: session?.user?.is_anonymous || false,
+      userId: session?.user?.id?.slice(0, 8) || 'N/A'
+    });
+  }
 
   return (
     <NavigationContainer ref={navigationRef}>
@@ -301,10 +354,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f8f9fa',
   },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    marginBottom: 12,
+  },
   loadingText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#667eea',
+    color: '#333',
     marginBottom: 8,
   },
   loadingSubtext: {
