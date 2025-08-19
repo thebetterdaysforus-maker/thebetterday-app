@@ -13,7 +13,7 @@ export default function HistoryStack() {
       <Stack.Screen 
         name="HistoryCalendar" 
         component={HistoryCalendarScreen}
-        options={{ title: '기록 달력' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="DayDetail" 
