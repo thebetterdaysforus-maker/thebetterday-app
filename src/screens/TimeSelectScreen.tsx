@@ -64,7 +64,7 @@ export default function TimeSelectScreen({ navigation, route }: any) {
 
   // 화면 로드 시 한 번만 목표 데이터 조회 
   React.useEffect(() => {
-    console.log('🔄 TimeSelectScreen에서 목표 데이터 강제 조회');
+    console.log('🔄 TimeSelectScreen에서 수행 목록 데이터 강제 조회');
     fetchGoals().catch(console.error);
   }, []); // fetchGoals 의존성 제거로 무한 루프 방지
 
@@ -111,7 +111,7 @@ export default function TimeSelectScreen({ navigation, route }: any) {
       isTomorrow,
       isTimeReset,
       현재시간: now.toLocaleString('ko-KR'),
-      목표시간: targetTime.toLocaleString('ko-KR'),
+      수행시간: targetTime.toLocaleString('ko-KR'),
       제약건너뜀: isTomorrow || isTimeReset
     });
     
@@ -119,10 +119,10 @@ export default function TimeSelectScreen({ navigation, route }: any) {
       // 🔥 새 목표 모드 3시간 제한 활성화 (당일만)
       const minAllowedTime = new Date(now.getTime() + 3 * 60 * 60 * 1000);
       if (targetTime <= minAllowedTime) {
-        console.log("❌ 당일 목표 3시간 제한 위반 - 알림 표시");
+        console.log("❌ 당일 수행 목록 작성 3시간 제한 위반 - 알림 표시");
         Alert.alert(
-          '목표 시간 제한', 
-          '새 목표는 현재 시간으로부터 최소 3시간 이후에 설정할 수 있습니다.\n\n' +
+          '수행 목록 설정 시간 제한', 
+          '새 수행 목록은 현재 시간으로부터 최소 3시간 이후에 설정할 수 있습니다.\n\n' +
           `현재 시간: ${now.toLocaleTimeString('ko-KR', { hour12: true, hour: '2-digit', minute: '2-digit' }).replace('AM', '오전').replace('PM', '오후')}\n` +
           `설정 가능한 시간: ${minAllowedTime.toLocaleTimeString('ko-KR', { hour12: true, hour: '2-digit', minute: '2-digit' }).replace('AM', '오전').replace('PM', '오후')} 이후`
         );
@@ -155,10 +155,10 @@ export default function TimeSelectScreen({ navigation, route }: any) {
       const goalDateLocal = goalDate.toLocaleDateString();
       const isSameDate = goalDateLocal === selectedDateLocal;
       
-      console.log("📅 개별 목표 날짜 비교:", {
-        목표: g.title,
-        목표시간: g.target_time,
-        목표날짜로컬: goalDateLocal,
+      console.log("📅 개별 수행 목록 날짜 비교:", {
+        수행: g.title,
+        수행시간: g.target_time,
+        수행날짜로컬: goalDateLocal,
         선택날짜로컬: selectedDateLocal,
         같은날짜: isSameDate
       });
@@ -188,7 +188,7 @@ export default function TimeSelectScreen({ navigation, route }: any) {
       const isConflict = timeDiff < thirtyMinutes;
 
       console.log("⏰ 정확한 충돌 체크:", {
-        기존목표: g.title,
+        기존목록: g.title,
         기존시간: new Date(g.target_time).toLocaleTimeString('ko-KR'),
         선택시간: targetTime.toLocaleTimeString('ko-KR'),
         시간차분: Math.round(timeDiff / (60 * 1000)) + "분",
@@ -210,7 +210,7 @@ export default function TimeSelectScreen({ navigation, route }: any) {
       
       Alert.alert(
         '시간 중복',
-        `선택한 시간과 30분 이내로 가까운 목표가 있습니다:\n\n${conflictInfo}\n\n다른 시간을 선택해주세요.`
+        `선택한 시간과 30분 이내로 가까운 목록이 존재합니다.:\n\n${conflictInfo}\n\n다른 시간을 선택해주세요.`
       );
       return; // 여기서 저장 차단
     }
@@ -227,7 +227,7 @@ export default function TimeSelectScreen({ navigation, route }: any) {
         batch: route.params?.batch ?? false,
       });
     } else {
-      // 새 목표 생성 모드
+      // 수행 목록 추가 모드
       navigation.navigate("GoalDetail", {
         goalId: null,
         prefilledTime: selectedTimeISO,
@@ -241,7 +241,7 @@ export default function TimeSelectScreen({ navigation, route }: any) {
       {/* 헤더 */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← 오늘의 목표</Text>
+          <Text style={styles.backButtonText}>← 수행 목록</Text>
         </TouchableOpacity>
         <Text style={styles.title}>시간 선택</Text>
       </View>
