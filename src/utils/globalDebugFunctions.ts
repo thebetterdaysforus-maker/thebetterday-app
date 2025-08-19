@@ -1,5 +1,5 @@
 // 🔧 전역 디버깅 함수들 - 통합 관리
-import { notificationManager } from './notificationManager';
+import { simpleNotificationManager } from './simpleNotificationManager';
 
 /**
  * 전역 디버깅 함수들을 window 객체에 등록
@@ -10,12 +10,12 @@ export const registerGlobalDebugFunctions = () => {
     // 알림 확인 및 관리 함수들
     (window as any).checkNotifications = async () => {
       console.log('🔍 현재 예약된 알림 확인 시작');
-      await notificationManager.getAllScheduledNotifications();
+      await simpleNotificationManager.getAllScheduledNotifications();
     };
 
     (window as any).clearAllNotifications = async () => {
       console.log('🧹 모든 알림 삭제 시작');
-      await notificationManager.cancelAllNotifications();
+      await simpleNotificationManager.cancelAllNotifications();
     };
 
     // 시간 디버깅 함수
@@ -59,7 +59,7 @@ export const registerGlobalDebugFunctions = () => {
     // 레거시 함수들 (호환성 유지)
     (window as any).emergencyCleanupNotifications = async () => {
       console.log('🚨 긴급 알림 정리 시작');
-      await notificationManager.cancelAllNotifications();
+      await simpleNotificationManager.cancelAllNotifications();
     };
 
     console.log('🔧 디버깅용 함수 등록 완료');
