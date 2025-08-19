@@ -2,30 +2,15 @@
 import { Platform } from 'react-native';
 
 export const logAPKEnvironment = () => {
-  // 개발 환경에서만 상세 로깅
-  if (!__DEV__) {
-    return;
-  }
+  if (!__DEV__) return;
   
-  console.log('📱 APK 환경 정보:');
-  console.log('- Platform:', Platform?.OS || 'unknown');
-  console.log('- 기본 API 지원:', {
-    fetch: typeof fetch !== 'undefined',
-    localStorage: typeof localStorage !== 'undefined',
-    AbortController: typeof AbortController !== 'undefined'
+  console.log('📱 APK 환경 정보:', {
+    platform: Platform?.OS || 'unknown',
+    apis: {
+      fetch: typeof fetch !== 'undefined',
+      AbortController: typeof AbortController !== 'undefined'
+    }
   });
-  
-  // 환경 변수 체크 (민감 정보 제외)
-  try {
-    const hasSupabaseUrl = !!(process?.env?.EXPO_PUBLIC_SUPABASE_URL);
-    const hasSupabaseKey = !!(process?.env?.EXPO_PUBLIC_SUPABASE_ANON_KEY);
-    console.log('- 환경변수:', {
-      supabaseUrl: hasSupabaseUrl ? '설정됨' : '없음',
-      supabaseKey: hasSupabaseKey ? '설정됨' : '없음'
-    });
-  } catch (error) {
-    console.log('- 환경 변수 확인 불가');
-  }
 };
 
 export const testNetworkConnectivity = async (): Promise<boolean> => {
@@ -68,25 +53,22 @@ export const testNetworkConnectivity = async (): Promise<boolean> => {
 };
 
 export const APKErrorReporter = {
-  // APK 실행 중 발생하는 오류들을 수집하고 분석
   errors: [] as Array<{ timestamp: Date; error: any; context: string }>,
   
   report: (error: any, context: string = 'unknown') => {
+    if (!__DEV__) return;
+    
     const errorLog = {
       timestamp: new Date(),
-      error: {
-        message: error?.message || 'Unknown error',
-        stack: error?.stack || 'No stack trace',
-        name: error?.name || 'Error'
-      },
+      error: { message: error?.message || 'Unknown error', name: error?.name || 'Error' },
       context
     };
     
     APKErrorReporter.errors.push(errorLog);
     console.log(`🚨 APK Error [${context}]:`, errorLog.error.message);
     
-    // 최근 10개 오류만 유지
-    if (APKErrorReporter.errors.length > 10) {
+    // 최근 5개 오류만 유지 (메모리 최적화)
+    if (APKErrorReporter.errors.length > 5) {
       APKErrorReporter.errors.shift();
     }
   },
