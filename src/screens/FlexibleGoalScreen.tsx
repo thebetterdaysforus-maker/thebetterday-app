@@ -162,7 +162,7 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
           <View style={styles.goalInput}>
             <TextInput
               style={styles.input}
-              placeholder="오늘 꼭 하고 싶은 필수 목표를 입력하세요"
+              placeholder="오늘 꼭 해야하는 것은 무엇인가요?!"
               placeholderTextColor="#999"
               value={newGoalText}
               onChangeText={setNewGoalText}
@@ -190,7 +190,7 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
           시간에 얽매이지 않고 오늘 달성하고 싶은 목표를 적어주세요!
         </Text>
         <Text style={styles.noticeText}>
-          📌 필수 목표는 당일에만 설정할 수 있습니다
+          📌 필수 목표는 당일 기준으로만 적용됩니다!
         </Text>
       </View>
 
@@ -202,7 +202,7 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
         <Text style={styles.helpTitle}>💡 사용 팁</Text>
         <Text style={styles.helpText}>
           • 하루에 하나의 필수 목표만 설정 가능합니다{"\n"}• 당일에만 설정할 수
-          있습니다{"\n"}• 예시: 독서 50페이지 이상 읽기{"\n"}• 성공률 데이터에는
+          있습니다{"\n"}• 예시: 독서 50페이지 이상 읽기{"\n"}• DB에는
           포함되지 않습니다
         </Text>
       </View>
@@ -222,15 +222,15 @@ const styles = StyleSheet.create({
     borderBottomColor: "#e0e0e0",
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "bold",
     color: "#333",
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#666",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   noticeText: {
     fontSize: 12,
@@ -280,8 +280,8 @@ const styles = StyleSheet.create({
   goalItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     backgroundColor: "#f8f9fa",
     borderRadius: 8,
     marginTop: 10,
@@ -318,15 +318,15 @@ const styles = StyleSheet.create({
   goalInput: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 8,
+    paddingTop: 15,
   },
   input: {
     flex: 1,
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 30,
     fontSize: 14,
     backgroundColor: "#fff",
   },
