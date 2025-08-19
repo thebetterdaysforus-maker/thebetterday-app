@@ -31,20 +31,20 @@ const useRetrospectStore = create<RetrospectState>((set, get) => ({
   fetchToday: async () => {
     // 한국 시간 기준으로 오늘 날짜 계산
     const today = getTodayKorea();
-    console.log('🔍 회고 조회 시작:', { today });
+    if (__DEV__) console.log('🔍 회고 조회 시작:', { today });
     const retrospect = await get().fetchOne(today);
-    console.log('🔍 회고 조회 결과:', { retrospect, exists: !!retrospect });
+    if (__DEV__) console.log('🔍 회고 조회 결과:', { retrospect, exists: !!retrospect });
     set({ todayRetrospectExists: !!retrospect });
   },
 
   fetchOne: async (date: string) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      console.log('🔍 회고 조회 실패: 세션 없음');
+      if (__DEV__) console.log('🔍 회고 조회 실패: 세션 없음');
       return null;
     }
 
-    console.log('🔍 회고 조회 요청:', { date });
+    if (__DEV__) console.log('🔍 회고 조회 요청:', { date });
 
     const { data, error } = await supabase
       .from('retrospects')
@@ -55,7 +55,7 @@ const useRetrospectStore = create<RetrospectState>((set, get) => ({
 
     if (error) {
       if (error.code === 'PGRST116') {
-        console.log('🔍 회고 조회 결과: 데이터 없음');
+        if (__DEV__) console.log('🔍 회고 조회 결과: 데이터 없음');
         return null;
       }
       console.error('🔍 회고 조회 오류:', error);
