@@ -196,7 +196,7 @@ export default function ProfileEditScreen({ navigation }: ProfileEditScreenProps
               style={[styles.input, styles.dreamInput]}
               value={dream}
               onChangeText={setDream}
-              placeholder="꿈이나 목표를 상세하게 적어주세요"
+              placeholder="사용자님의 꿈은 무엇인가요?"
               multiline
               numberOfLines={4}
               maxLength={200}
@@ -208,8 +208,8 @@ export default function ProfileEditScreen({ navigation }: ProfileEditScreenProps
           <View style={styles.helpText}>
             <Text style={styles.helpTitle}>💡 작성 가이드</Text>
             <Text style={styles.helpContent}>
-              • 닉네임은 커뮤니티에서 다른 사용자들에게 보여집니다{'\n'}
-              • 꿈은 목표 달성의 동기부여로 활용됩니다{'\n'}
+              • 불쾌함과 혐오감을 줄 수 있는 표현은 삼가 주세요.{'\n'}
+              • 어떤 꿈이든 소중하며, 그 자체로 위대한 의미가 있습니다.{'\n'}
               • 언제든지 수정할 수 있으니 편하게 작성해주세요
             </Text>
           </View>
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   helpContent: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     lineHeight: 20,
   },
