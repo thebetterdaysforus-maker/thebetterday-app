@@ -79,14 +79,14 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
   loading: false,
 
   calculateStatistics: async () => {
-    console.log('🚨🚨🚨 calculateStatistics 함수 실행됨!!!');
+    if (__DEV__) console.log('🚨🚨🚨 calculateStatistics 함수 실행됨!!!');
     const { session } = useUserStore.getState();
     if (!session) {
-      console.log('❌ 세션 없음, 계산 중단');
+      if (__DEV__) console.log('❌ 세션 없음, 계산 중단');
       return;
     }
 
-    console.log('✅ 세션 확인됨, 계산 시작');
+    if (__DEV__) console.log('✅ 세션 확인됨, 계산 시작');
     set({ loading: true });
     try {
       // 기본 통계 계산
@@ -111,7 +111,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
 
       // 연속 성공 계산 (수정된 로직)
       const sortedGoals = goals?.sort((a, b) => new Date(b.target_time).getTime() - new Date(a.target_time).getTime()) || [];
-      console.log('🔍 연속 기록 계산 시작:', {
+      if (__DEV__) console.log('🔍 연속 기록 계산 시작:', {
         totalGoals: goals?.length,
         sortedGoalsCount: sortedGoals.length,
         firstFewGoals: sortedGoals.slice(0, 5).map(g => ({ 
@@ -135,7 +135,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
       for (let i = 0; i < sortedGoals.length; i++) {
         const goal = sortedGoals[i];
         if (goal.status === 'pending') {
-          console.log(`⏳ [${i}] pending 목표 건너뜀:`, { title: goal.title, date: goal.korean_date });
+          if (__DEV__) console.log(`⏳ [${i}] pending 목표 건너뜀:`, { title: goal.title, date: goal.korean_date });
           continue; // pending 목표는 제외
         }
         
