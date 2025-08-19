@@ -197,7 +197,12 @@ export default function HistoryCalendarScreen() {
 
   /* ---------- UI ---------- */
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <Text style={styles.title}>기록 달력</Text>
+      </View>
+      
       <Calendar dayComponent={dayComponent} /* onDayPress 제거 */ />
 
       {/* 범례 */}
@@ -232,6 +237,22 @@ export default function HistoryCalendarScreen() {
 const CELL = Platform.OS === 'web' ? 46 : 40;
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  header: {
+    padding: 20,
+    paddingTop: 50,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   cell:       { width: CELL, height: CELL, alignItems: 'center', justifyContent: 'center' },
   dayText:    { fontSize: 15 },
   dim:        { color: '#ccc' },
@@ -248,13 +269,16 @@ const styles = StyleSheet.create({
   
   buttonContainer: {
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   statisticsButton: {
     backgroundColor: '#4CAF50',
-    paddingVertical: 12,
+    marginTop : 20,
+    marginLeft : 75,
+    marginRight:75,
+    paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 16,
     alignItems: 'center',
   },
   statisticsButtonText: {
