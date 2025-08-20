@@ -295,7 +295,7 @@ function MainApp() {
       <View style={styles.loadingContainer}>
         <View style={styles.logoContainer}>
           <Image 
-            source={require('./assets/footprint-logo.png')} 
+            source={require('./assets/icon.png')} 
             style={styles.logoImage}
             resizeMode="contain"
           />
