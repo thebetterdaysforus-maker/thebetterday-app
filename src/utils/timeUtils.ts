@@ -58,8 +58,19 @@ export function getCurrentTime(): Date {
       currentTimeZone = 'Asia/Seoul';
     }
     
-    // 기본적으로 한국 시간 반환
-    return getKoreaTime();
+    // 설정된 시간대 기준으로 현재 시간 반환
+    const now = new Date();
+    const timeInSelectedZone = new Date(now.toLocaleString("en-US", { timeZone: currentTimeZone }));
+    
+    if (__DEV__) {
+      console.log('🕐 현재 시간 계산:', {
+        설정된시간대: currentTimeZone,
+        UTC시간: now.toISOString(),
+        해당시간대시간: timeInSelectedZone.toLocaleString(),
+      });
+    }
+    
+    return timeInSelectedZone;
   } catch (error) {
     console.error('❌ 시간대 처리 오류:', error);
     console.warn('🔄 기본 시간대(Asia/Seoul)로 폴백');
