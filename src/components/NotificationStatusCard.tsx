@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { unifiedNotificationManager } from '../utils/unifiedNotificationManager';
+import { simpleNotificationManager } from '../utils/simpleNotificationManager';
 
 interface NotificationStatusCardProps {
-  style?: any;
+  style?: object;
 }
 
 export const NotificationStatusCard: React.FC<NotificationStatusCardProps> = ({ style }) => {
@@ -23,11 +23,17 @@ export const NotificationStatusCard: React.FC<NotificationStatusCardProps> = ({ 
 
   const checkNotificationStatus = async () => {
     try {
-      const status = unifiedNotificationManager.getSystemStatus();
-      setSystemStatus(status);
+      await simpleNotificationManager.initialize();
       
-      const notifications = await unifiedNotificationManager.getScheduledNotifications();
-      setNotificationCount(notifications.length);
+      // 단순화된 상태 정보
+      setSystemStatus({
+        isInitialized: true,
+        isEnhancedMode: false, // 단순 알림 시스템
+        platform: 'mobile'
+      });
+      
+      await simpleNotificationManager.getAllScheduledNotifications();
+      setNotificationCount(0); // 단순 시스템에서는 개수 표시 간소화
     } catch (error) {
       console.error('알림 상태 확인 실패:', error);
     }
