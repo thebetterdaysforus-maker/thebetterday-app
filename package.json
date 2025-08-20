@@ -31,7 +31,7 @@
     "@supabase/postgrest-js": "^1.21.2",
     "@supabase/realtime-js": "^2.15.2",
     "@supabase/storage-js": "^2.11.0",
-    "@supabase/supabase-js": "^2.55.0",
+    "@supabase/supabase-js": "^2.39.0",
     "@types/node": "^24.0.10",
     "@types/react": "~19.0.10",
     "@types/react-dom": "^19.1.6",
