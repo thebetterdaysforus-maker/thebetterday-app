@@ -93,7 +93,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
   fetchMyResolution: async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const tomorrow = getTomorrowString(); // 내일 날짜 기준으로 조회
+      const today = getTodayString(); // 오늘 날짜 기준으로 조회 (각오는 당일에 표시되어야 함)
       
       if (session) {
         // 정식 회원 - Supabase에서 조회
@@ -101,7 +101,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
           .from('daily_resolutions')
           .select('*')
           .eq('user_id', session.user.id)
-          .eq('date', tomorrow)
+          .eq('date', today)
           .single();
 
         if (error && error.code !== 'PGRST116') {
@@ -122,7 +122,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
   saveMyResolution: async (content: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const tomorrow = getTomorrowString(); // 내일 날짜로 저장
+      const today = getTodayString(); // 오늘 날짜로 저장 (각오는 당일 작성)
       
       // 로그인 사용자든 게스트든 모두 Supabase 사용
       const userId = session?.user?.id || `guest_${nanoid()}`;
@@ -132,7 +132,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
         .insert([{
           user_id: userId,
           content,
-          date: tomorrow,
+          date: today,
         }])
         .select()
         .single();
@@ -143,7 +143,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
           errorMessage: error.message,
           errorDetails: error.details,
           errorHint: error.hint,
-          targetDate: tomorrow,
+          targetDate: today,
           userId: userId,
           isGuest: !session,
           content: content?.substring(0, 50) + '...'
@@ -155,7 +155,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
             .from('daily_resolutions')
             .select('*')
             .eq('user_id', userId)
-            .eq('date', tomorrow)
+            .eq('date', today)
             .single();
           
           if (existingData) {
