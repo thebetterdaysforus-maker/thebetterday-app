@@ -8,7 +8,9 @@ import {
   View,
   StyleSheet,
   ScrollView,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import useRetrospectStore from "../store/retrospectStore";
 import useGoalStore from "../store/goalStore";
 // date-fns 제거하고 네이티브 Date 사용
@@ -21,24 +23,25 @@ export default function RetrospectScreen({ navigation }: any) {
   // 한국 시간 기준으로 오늘의 실패한 목표들 직접 계산
   const today = new Date();
   const koreaTime = new Date(today.getTime() + 9 * 60 * 60 * 1000);
-  const todayStr = koreaTime.toISOString().split('T')[0]; // YYYY-MM-DD
-  
+  const todayStr = koreaTime.toISOString().split("T")[0]; // YYYY-MM-DD
+
   const todayGoals = goals.filter((goal) => {
     const goalDate = new Date(goal.target_time);
     const goalKoreaTime = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
-    return goalKoreaTime.toISOString().split('T')[0] === todayStr;
+    return goalKoreaTime.toISOString().split("T")[0] === todayStr;
   });
 
-  const failedGoals = todayGoals.filter(goal => goal.status === "failure");
+  const failedGoals = todayGoals.filter((goal) => goal.status === "failure");
   const hasFailure = failedGoals.length > 0;
-  const allDone = todayGoals.length > 0 && todayGoals.every((g) => g.status !== "pending");
+  const allDone =
+    todayGoals.length > 0 && todayGoals.every((g) => g.status !== "pending");
 
   console.log("🔍 회고 화면 목표 상태:", {
     오늘날짜: todayStr,
     전체목표: todayGoals.length,
     실패목표: failedGoals.length,
     실패여부: hasFailure,
-    목표상태: todayGoals.map(g => ({ title: g.title, status: g.status }))
+    목표상태: todayGoals.map((g) => ({ title: g.title, status: g.status })),
   });
 
   // 완전승리 시에는 동기부여 메시지 생략, 실패 시에만 격려 메시지 표시
@@ -73,57 +76,66 @@ export default function RetrospectScreen({ navigation }: any) {
     });
   }, [navigation, txt]);
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <ScrollView style={styles.container}>
-      {/* 완전 승리 시 특별 메시지 */}
-      {allDone && !hasFailure && (
-        <View style={styles.victoryBox}>
-          <Text style={styles.victoryTitle}>🎉 완전 승리! 🎉</Text>
-          <Text style={styles.victoryMessage}>
-            오늘 모든 목표를 달성하셨습니다! {"\n"} 정말 대단한 성취입니다.
-          </Text>
-        </View>
-      )}
+    <View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      <View style={{ paddingTop: insets.top }} />
+      <ScrollView style={styles.container}>
+        {/* 완전 승리 시 특별 메시지 */}
+        {allDone && !hasFailure && (
+          <View style={styles.victoryBox}>
+            <Text style={styles.victoryTitle}>🎉 완전 승리! 🎉</Text>
+            <Text style={styles.victoryMessage}>
+              오늘 모든 목표를 달성하셨습니다! {"\n"} 정말 대단한 성취입니다.
+            </Text>
+          </View>
+        )}
 
-      {/* 패배한 목표 목록 */}
-      {failedGoals.length > 0 && (
-        <View style={styles.failedGoalsBox}>
-          <Text style={styles.failedGoalsTitle}>⚠️ 패배한 목표들</Text>
-          {failedGoals.map((goal) => (
-            <View key={goal.id} style={styles.failedGoalItem}>
-              <Text style={styles.failedGoalTime}>
-                {new Date(goal.target_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-              <Text style={styles.failedGoalTitle}>{goal.title}</Text>
-            </View>
-          ))}
-          <Text style={styles.failedGoalsNote}>
-            패배는 그저 승리의 발판입니다!
-          </Text>
-        </View>
-      )}
+        {/* 패배한 목표 목록 */}
+        {failedGoals.length > 0 && (
+          <View style={styles.failedGoalsBox}>
+            <Text style={styles.failedGoalsTitle}>⚠️ 패배한 목표들</Text>
+            {failedGoals.map((goal) => (
+              <View key={goal.id} style={styles.failedGoalItem}>
+                <Text style={styles.failedGoalTime}>
+                  {new Date(goal.target_time).toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Text>
+                <Text style={styles.failedGoalTitle}>{goal.title}</Text>
+              </View>
+            ))}
+            <Text style={styles.failedGoalsNote}>
+              패배는 그저 승리의 발판입니다!
+            </Text>
+          </View>
+        )}
 
-      {/* 실패한 경우에만 동기부여 메시지 표시 */}
-      {motivationalMessage && (
-        <View style={styles.motivationBox}>
-          <Text style={styles.motivationText}>{motivationalMessage}</Text>
-        </View>
-      )}
+        {/* 실패한 경우에만 동기부여 메시지 표시 */}
+        {motivationalMessage && (
+          <View style={styles.motivationBox}>
+            <Text style={styles.motivationText}>{motivationalMessage}</Text>
+          </View>
+        )}
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>오늘의 회고</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="오늘 하루 어땠나요? 부담없이 이야기해보세요!"
-          placeholderTextColor="rgba(235, 181, 181, 0.7)"
-          multiline
-          value={txt}
-          onChangeText={setTxt}
-          returnKeyType="done"
-          onSubmitEditing={Keyboard.dismiss}
-        />
-      </View>
-    </ScrollView>
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>오늘의 회고</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="오늘 하루 어땠나요? 부담없이 이야기해주세요!"
+            placeholderTextColor="rgba(235, 181, 181, 0.7)"
+            multiline
+            value={txt}
+            onChangeText={setTxt}
+            returnKeyType="done"
+            onSubmitEditing={Keyboard.dismiss}
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
