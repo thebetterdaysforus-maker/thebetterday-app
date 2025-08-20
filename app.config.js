@@ -23,6 +23,7 @@ export default ({ config }) => ({
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#D4AF37"
     },
+    icon: "./assets/icon.png",
     package: "com.thebetterday.app",
     permissions: [
       "android.permission.INTERNET",
