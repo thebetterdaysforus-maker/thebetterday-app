@@ -9,7 +9,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import useCommunityStore, {
   DailyResolution,
   FilterType,
@@ -115,8 +117,12 @@ const CommunityScreen = () => {
     [handleToggleLike],
   );
 
+  const insets = useSafeAreaInsets();
+  
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      <View style={{ paddingTop: insets.top }} />
       {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.title}>별들의 외침</Text>
