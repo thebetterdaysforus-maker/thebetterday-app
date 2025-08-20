@@ -8,7 +8,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CommonActions, StackActions } from "@react-navigation/native";
 import useGoalStore from "../store/goalStore";
 import {
@@ -170,12 +172,12 @@ export default function GoalDetailScreen({ route, navigation }: any) {
           title: trimmed,
           target_time: targetTime,
         });
-        console.log('✅ 목표 수정 완료 - 홈 화면으로 이동');
+        console.log("✅ 목표 수정 완료 - 홈 화면으로 이동");
       } else {
         await addGoal(trimmed, targetTime);
-        console.log('✅ 목표 추가 완료 - 홈 화면으로 이동');
+        console.log("✅ 목표 추가 완료 - 홈 화면으로 이동");
       }
-      
+
       // 강제 화면 이동 보장
       setTimeout(() => {
         backToList();
@@ -210,94 +212,106 @@ export default function GoalDetailScreen({ route, navigation }: any) {
     ]);
 
   /* ───────── UI ───────── */
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.headerText}>
-        {existing ? "수행 목록 수정" : batch ? "수행 목록 작성" : "수행 목록 추가"}
-      </Text>
-
-      {/* 선택된 시간 */}
-      <Text style={styles.timeText}>
-        {new Date(targetTime)
-          .toLocaleTimeString("ko-KR", {
-            hour12: true,
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-          .replace("AM", "오전")
-          .replace("PM", "오후")}
-      </Text>
-
-      {/* 시간 재설정 버튼 (편집 모드에서 항상 표시) */}
-      {(existing || !batch) && (
-        <>
-          <TouchableOpacity
-            style={styles.timeResetButton}
-            onPress={() => {
-              // 기존 목표 편집 시 시간 재설정
-              if (existing) {
-                // 한국 시간 기준으로 내일 목표인지 확인
-                const goalDate = new Date(existing.target_time);
-                const koreanDate = new Date(
-                  goalDate.getTime() + 9 * 60 * 60 * 1000,
-                );
-                const now = new Date();
-                const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-                const tomorrowKey = new Date(koreaTime.getTime() + 86400000)
-                  .toISOString()
-                  .slice(0, 10);
-                const goalDateKey = koreanDate.toISOString().slice(0, 10);
-
-                const isTomorrow = goalDateKey === tomorrowKey;
-
-                navigation.navigate("TimeSelect", {
-                  goalId: goalId,
-                  currentTime: targetTime,
-                  initial: isTomorrow ? "tomorrow" : "today",
-                });
-              } else {
-                // 수행 목록 추가 시
-                navigation.navigate("TimeSelect", {
-                  goalId: goalId,
-                  currentTime: targetTime,
-                });
-              }
-            }}
-          >
-            <Text style={styles.timeResetButtonText}>시간 재설정</Text>
-          </TouchableOpacity>
-          <View style={{ height: 24 }} />
-        </>
-      )}
-
-      <TextInput
-        placeholder="무엇을 하고자 하시나요?"
-        placeholderTextColor="#999"
-        value={title}
-        maxLength={40}
-        onChangeText={handleChange}
-        style={[
-          styles.textInput,
-          { borderColor: inputErr ? "#E53935" : "#ccc" },
-        ]}
-      />
-
-      {inputErr && (
-        <Text style={styles.errorText}>
-          특수문자 없이 40자 이내로 작성해 주세요.
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <View style={{ paddingTop: insets.top }} />
+      <View style={styles.container}>
+        <Text style={styles.headerText}>
+          {existing
+            ? "수행 목록 수정"
+            : batch
+              ? "수행 목록 작성"
+              : "수행 목록 추가"}
         </Text>
-      )}
 
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>저장</Text>
-      </TouchableOpacity>
+        {/* 선택된 시간 */}
+        <Text style={styles.timeText}>
+          {new Date(targetTime)
+            .toLocaleTimeString("ko-KR", {
+              hour12: true,
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+            .replace("AM", "오전")
+            .replace("PM", "오후")}
+        </Text>
 
-      {/* 단건 모드의 편집 시에만 삭제 버튼 표시 */}
-      {existing && !batch && (
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <Text style={styles.deleteButtonText}>삭제</Text>
+        {/* 시간 재설정 버튼 (편집 모드에서 항상 표시) */}
+        {(existing || !batch) && (
+          <>
+            <TouchableOpacity
+              style={styles.timeResetButton}
+              onPress={() => {
+                // 기존 목표 편집 시 시간 재설정
+                if (existing) {
+                  // 한국 시간 기준으로 내일 목표인지 확인
+                  const goalDate = new Date(existing.target_time);
+                  const koreanDate = new Date(
+                    goalDate.getTime() + 9 * 60 * 60 * 1000,
+                  );
+                  const now = new Date();
+                  const koreaTime = new Date(
+                    now.getTime() + 9 * 60 * 60 * 1000,
+                  );
+                  const tomorrowKey = new Date(koreaTime.getTime() + 86400000)
+                    .toISOString()
+                    .slice(0, 10);
+                  const goalDateKey = koreanDate.toISOString().slice(0, 10);
+
+                  const isTomorrow = goalDateKey === tomorrowKey;
+
+                  navigation.navigate("TimeSelect", {
+                    goalId: goalId,
+                    currentTime: targetTime,
+                    initial: isTomorrow ? "tomorrow" : "today",
+                  });
+                } else {
+                  // 수행 목록 추가 시
+                  navigation.navigate("TimeSelect", {
+                    goalId: goalId,
+                    currentTime: targetTime,
+                  });
+                }
+              }}
+            >
+              <Text style={styles.timeResetButtonText}>시간 재설정</Text>
+            </TouchableOpacity>
+            <View style={{ height: 24 }} />
+          </>
+        )}
+
+        <TextInput
+          placeholder="무엇을 하고자 하시나요?"
+          placeholderTextColor="#999"
+          value={title}
+          maxLength={40}
+          onChangeText={handleChange}
+          style={[
+            styles.textInput,
+            { borderColor: inputErr ? "#E53935" : "#ccc" },
+          ]}
+        />
+
+        {inputErr && (
+          <Text style={styles.errorText}>
+            특수문자 없이 40자 이내로 작성해 주세요.
+          </Text>
+        )}
+
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <Text style={styles.saveButtonText}>저장</Text>
         </TouchableOpacity>
-      )}
+
+        {/* 단건 모드의 편집 시에만 삭제 버튼 표시 */}
+        {existing && !batch && (
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+            <Text style={styles.deleteButtonText}>삭제</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
