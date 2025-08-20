@@ -10,8 +10,9 @@ import {
   TouchableOpacity,
   View,
   Keyboard,
-  SafeAreaView,
+  StatusBar,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { nanoid } from "nanoid";
 import useGoalStore from "../store/goalStore";
@@ -40,7 +41,9 @@ export default function GoalBatchScreen({ route }: any) {
 
   /* 텍스트 입력 상태 관리 */
   const [isTextInputActive, setIsTextInputActive] = useState(false);
+  const [activeInputId, setActiveInputId] = useState<string | null>(null);
   const inputRefs = useRef<{ [key: string]: TextInput | null }>({});
+  const scrollViewRef = useRef<FlatList>(null);
 
   /* 시간 선택 모달 상태 */
   const [isTimePickerVisible, setIsTimePickerVisible] = useState(false);
@@ -48,10 +51,12 @@ export default function GoalBatchScreen({ route }: any) {
   const [isTimeValid, setIsTimeValid] = useState<boolean>(true);
 
   /* ② 제목 변경 */
-  const changeTitle = (id: string, text: string) =>
+  const changeTitle = (id: string, text: string) => {
+    console.log('✏️ 제목 변경:', { id, text: text.substring(0, 20) + (text.length > 20 ? '...' : '') });
     setTempGoals((prev) =>
       prev.map((g) => (g.id === id ? { ...g, title: text } : g)),
     );
+  };
 
   /* ③ 행 삭제 - 내일 모드일 때 5개 미만으로 삭제 방지 */
   const removeRow = (id: string) => {
@@ -373,19 +378,39 @@ export default function GoalBatchScreen({ route }: any) {
   };
 
   /* ──────────────── UI ──────────────── */
+  const insets = useSafeAreaInsets();
+  
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F0F0F0" />
+      <View style={{ paddingTop: insets.top }} />
       <FlatList
+        ref={scrollViewRef}
         data={tempGoals}
         keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <View style={styles.row}>
             <TouchableOpacity
               onPress={() => {
                 // 시간 텍스트 클릭 시 해당 입력 필드로 포커스
-                if (inputRefs.current[item.id]) {
-                  inputRefs.current[item.id]?.focus();
+                console.log('🎯 시간 버튼 클릭:', { itemId: item.id, itemTime: item.time });
+                
+                // 현재 활성화된 input이 있다면 blur 처리
+                if (activeInputId && inputRefs.current[activeInputId]) {
+                  inputRefs.current[activeInputId]?.blur();
                 }
+                
+                // 약간의 지연 후 새 input에 포커스
+                setTimeout(() => {
+                  if (inputRefs.current[item.id]) {
+                    console.log('✅ 포커스 이동:', { fromId: activeInputId, toId: item.id });
+                    inputRefs.current[item.id]?.focus();
+                    setActiveInputId(item.id);
+                  } else {
+                    console.warn('❌ ref가 없음:', { itemId: item.id });
+                  }
+                }, 100);
               }}
               style={styles.timeContainer}
             >
@@ -403,14 +428,23 @@ export default function GoalBatchScreen({ route }: any) {
 
             <TextInput
               ref={(ref) => {
+                console.log('📝 TextInput ref 설정:', { itemId: item.id, refExists: !!ref });
                 inputRefs.current[item.id] = ref;
               }}
               placeholder="무엇을 하고자 하시나요?"
               placeholderTextColor="#999"
               value={item.title}
               onChangeText={(t) => changeTitle(item.id, t)}
-              onFocus={() => setIsTextInputActive(true)}
-              onBlur={() => setIsTextInputActive(false)}
+              onFocus={() => {
+                console.log('🎯 TextInput 포커스 이벤트:', { itemId: item.id });
+                setIsTextInputActive(true);
+                setActiveInputId(item.id);
+              }}
+              onBlur={() => {
+                console.log('👋 TextInput 블러 이벤트:', { itemId: item.id });
+                setIsTextInputActive(false);
+                setActiveInputId(null);
+              }}
               style={styles.input}
             />
 
@@ -526,7 +560,7 @@ export default function GoalBatchScreen({ route }: any) {
           />
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
