@@ -7,11 +7,12 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  SafeAreaView,
   Animated,
   Image,
   Modal,
+  StatusBar,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../supabaseClient";
 import { useAuthStore } from "../store/authStore";
@@ -534,8 +535,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     </TouchableOpacity>
   );
 
+  const insets = useSafeAreaInsets();
+  
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      <View style={{ paddingTop: insets.top }} />
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>설정</Text>
@@ -867,7 +872,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
