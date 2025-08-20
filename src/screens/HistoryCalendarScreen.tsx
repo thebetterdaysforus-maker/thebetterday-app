@@ -2,7 +2,8 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { memo, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View, } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CalendarProps, DateData } from 'react-native-calendars';
 import { Calendar } from 'react-native-calendars';
 import { supabase } from '../supabaseClient';
@@ -196,8 +197,12 @@ export default function HistoryCalendarScreen() {
     );
 
   /* ---------- UI ---------- */
+  const insets = useSafeAreaInsets();
+  
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <View style={{ paddingTop: insets.top }} />
       {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.title}>기록 달력</Text>
