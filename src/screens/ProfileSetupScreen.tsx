@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import useProfileStore from "../store/profileStore";
@@ -83,9 +83,9 @@ export default function ProfileSetupScreen({ route }: any) {
   /* 원클릭 전체 동의 */
   const handleOneClickAgree = () => {
     const allRequired = Object.fromEntries(
-      AGREEMENTS.map((a) => [a.key, a.required ? true : agree[a.key]])
+      AGREEMENTS.map((a) => [a.key, a.required ? true : agree[a.key]]),
     ) as Record<AgreeKey, boolean>;
-    
+
     setAgree(allRequired);
     setAllAgree(true);
   };
@@ -123,25 +123,25 @@ export default function ProfileSetupScreen({ route }: any) {
   // 📛 단순한 닉네임 검증 (길이와 욕설만 체크)
   const checkNicknameContent = (inputNickname: string): string | null => {
     const trimmed = inputNickname.trim();
-    
+
     // 기본 검증만
     if (!trimmed) return "닉네임을 입력해주세요";
     if (trimmed.length < 2) return "닉네임은 최소 2글자 이상이어야 합니다";
     if (trimmed.length > 10) return "닉네임은 최대 10글자까지 가능합니다";
-    
+
     // 욕설/불쾌한 표현만 필터링
     try {
-      const Filter = require('badwords-ko');
+      const Filter = require("badwords-ko");
       const filter = new Filter();
-      
+
       if (filter.isProfane(trimmed)) {
         return "부적절한 단어가 포함되어 있습니다. 다른 닉네임을 사용해주세요";
       }
     } catch (error) {
-      console.log('욕설 필터 오류:', error);
+      console.log("욕설 필터 오류:", error);
       // 필터 오류 시에도 계속 진행
     }
-    
+
     return null; // 통과
   };
 
@@ -162,10 +162,9 @@ export default function ProfileSetupScreen({ route }: any) {
       }
 
       // 2. 중복 검사 (RLS 우회 함수 사용)
-      const { data, error } = await supabase.rpc(
-        'check_display_name_exists',
-        { input_display_name: inputNickname.trim() }
-      );
+      const { data, error } = await supabase.rpc("check_display_name_exists", {
+        input_display_name: inputNickname.trim(),
+      });
 
       if (error) {
         console.error("닉네임 중복 검사 오류:", error);
@@ -190,7 +189,7 @@ export default function ProfileSetupScreen({ route }: any) {
     }
   };
 
-  console.log('🔍 ProfileSetupScreen 렌더링됨 - 게스트 모드에서 진입');
+  console.log("🔍 ProfileSetupScreen 렌더링됨 - 게스트 모드에서 진입");
 
   /* 저장 */
   const [isSaving, setIsSaving] = useState(false);
@@ -221,25 +220,24 @@ export default function ProfileSetupScreen({ route }: any) {
     setIsSaving(true);
     try {
       // 유입 경로와 함께 프로필 저장 (유입경로는 선택사항)
-      await saveProfile(nickname.trim(), dream.trim(), referrer || 'direct');
-      
+      await saveProfile(nickname.trim(), dream.trim(), referrer || "direct");
+
       console.log("🔘 프로필 저장 완료 - 메인 화면으로 이동");
-      
+
       // 🔥 "내일 우선" 로직: 신규 사용자는 첫 목표를 내일 목표로 작성
       // 프로필 설정 완료 후 자동으로 MainTab으로 이동됨 (App.tsx에서 처리)
       console.log("✅ 신규 사용자 프로필 설정 완료 - 자동으로 메인 화면 이동");
     } catch (e: any) {
       console.error("프로필 저장 실패:", e);
       Alert.alert(
-        "네트워크 오류", 
-        "인터넷 연결을 확인하고 다시 시도해주세요.\n\n오류: " + (e.message || "알 수 없는 오류")
+        "네트워크 오류",
+        "인터넷 연결을 확인하고 다시 시도해주세요.\n\n오류: " +
+          (e.message || "알 수 없는 오류"),
       );
     } finally {
       setIsSaving(false);
     }
   };
-
-
 
   const renderReferrerRadioButtons = () => {
     return (
@@ -283,9 +281,7 @@ export default function ProfileSetupScreen({ route }: any) {
       {/* 헤드라인 */}
       <Text style={styles.head1}>
         지금 바로 시작하기 위해{"\n"}
-        <Text style={styles.head2}>
-          간단한 정보만 입력해주세요!
-        </Text>
+        <Text style={styles.head2}>간단한 정보만 입력해주세요!</Text>
       </Text>
 
       {/* 꿈 입력 */}
@@ -293,7 +289,7 @@ export default function ProfileSetupScreen({ route }: any) {
       <TextInput
         value={dream}
         onChangeText={setDream}
-        placeholder="꿈의 크기나 모양은 상관없습니다!"
+        placeholder="사람들이 하찮다고 여기는 꿈일지라도, 그 꿈을 향해 나아가는 모든 사람들은 위대합니다!"
         placeholderTextColor="#888"
         multiline
         style={[styles.input, { height: 100, textAlignVertical: "top" }]}
@@ -307,7 +303,7 @@ export default function ProfileSetupScreen({ route }: any) {
           if (t.length <= 10) {
             setNickname(t);
             setNicknameError(""); // 입력 시 오류 메시지 초기화
-            
+
             // 실시간 콘텐츠 필터링
             const contentError = checkNicknameContent(t);
             if (contentError && t.trim().length > 0) {
@@ -358,29 +354,34 @@ export default function ProfileSetupScreen({ route }: any) {
           >
             <View style={styles.checkboxContainer}>
               <Ionicons
-                name={agree[agreement.key] ? "checkmark-circle" : "ellipse-outline"}
+                name={
+                  agree[agreement.key] ? "checkmark-circle" : "ellipse-outline"
+                }
                 size={20}
                 color={agree[agreement.key] ? "#8b5cf6" : "#d1d5db"}
               />
             </View>
-            <Text style={styles.agreementText}>
-              {agreement.label}
-            </Text>
+            <Text style={styles.agreementText}>{agreement.label}</Text>
           </TouchableOpacity>
         ))}
-
-
       </View>
 
       {/* 버튼 영역 */}
       <View style={{ marginTop: 24 }}>
         <TouchableOpacity
-          style={[styles.startButton, (isCheckingNickname || isSaving) && styles.startButtonDisabled]}
+          style={[
+            styles.startButton,
+            (isCheckingNickname || isSaving) && styles.startButtonDisabled,
+          ]}
           onPress={handleSave}
           disabled={isCheckingNickname || isSaving}
         >
           <Text style={styles.startButtonText}>
-            {isSaving ? "저장 중..." : isCheckingNickname ? "닉네임 확인 중..." : "완료"}
+            {isSaving
+              ? "저장 중..."
+              : isCheckingNickname
+                ? "닉네임 확인 중..."
+                : "완료"}
           </Text>
         </TouchableOpacity>
       </View>
