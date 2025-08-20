@@ -155,18 +155,22 @@ export class SimpleNotificationManager {
       return;
     }
 
-    // 🔥 한국 시간 기준으로 정확한 시간 비교
-    const nowKorea = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-    const targetKorea = new Date(targetTime.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    // 🔥 사용자 설정 시간대 기준으로 정확한 시간 비교
+    const { getCurrentTimeZone } = await import('../utils/timeUtils');
+    const userTimeZone = await getCurrentTimeZone();
+    
+    const nowUserTZ = new Date(new Date().toLocaleString("en-US", { timeZone: userTimeZone }));
+    const targetUserTZ = new Date(targetTime.toLocaleString("en-US", { timeZone: userTimeZone }));
     
     if (__DEV__) console.log('⏰ 알림 시간 검증:', {
-      현재한국시간: nowKorea.toLocaleString('ko-KR'),
-      목표한국시간: targetKorea.toLocaleString('ko-KR'),
+      현재사용자시간: nowUserTZ.toLocaleString('ko-KR'),
+      목표사용자시간: targetUserTZ.toLocaleString('ko-KR'),
+      사용자시간대: userTimeZone,
       UTC목표시간: targetTime.toISOString(),
-      지났는지: targetKorea <= nowKorea
+      지났는지: targetUserTZ <= nowUserTZ
     });
     
-    if (targetKorea <= nowKorea) {
+    if (targetUserTZ <= nowUserTZ) {
       if (__DEV__) console.log('⏰ 목표 시간이 이미 지나서 알림 설정 안함');
       return;
     }
@@ -178,20 +182,24 @@ export class SimpleNotificationManager {
       return;
     }
 
-    // 🚫 알림 권한 요청 비활성화 - 기본 설정에서 알림 활성화됨
-    // 사용자가 원할 때만 설정에서 비활성화 가능
-    if (__DEV__) console.log('✅ 알림 권한 자동 승인 (팝업 방지)');
+    // 🔔 알림 권한 요청 및 확인
+    const hasPermission = await this.requestPermission();
+    if (!hasPermission) {
+      if (__DEV__) console.log('🚫 알림 권한 거부됨 - 스케줄링 중단');
+      return;
+    }
+    if (__DEV__) console.log('✅ 알림 권한 확인 완료');
 
     try {
       // 기존 목표 알림 취소 (중복 방지)
       await this.cancelGoalNotifications(goalId);
 
-      // 🔔 정확한 -5분, +3분 알림 시스템 (한국시간 기준)
+      // 🔔 정확한 -5분, +3분 알림 시스템 (사용자 시간대 기준)
       // 1. 준비 알림 (목표 시간 -5분) - 확인 버튼 활성화 시점
       const prepareTime = new Date(targetTime.getTime() - 5 * 60 * 1000);
-      const prepareTimeKorea = new Date(prepareTime.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+      const prepareTimeUserTZ = new Date(prepareTime.toLocaleString("en-US", { timeZone: userTimeZone }));
       
-      if (prepareTimeKorea > nowKorea) {
+      if (prepareTimeUserTZ > nowUserTZ) {
         const prepareMessage = await getRandomNotificationMessage('general');
         await Notifications.scheduleNotificationAsync({
           identifier: `goal_prepare_${goalId}`,
@@ -208,9 +216,9 @@ export class SimpleNotificationManager {
           trigger: { date: prepareTime } as any,
         });
 
-        if (__DEV__) console.log(`🔔 준비 알림 설정 완료: ${prepareTime.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
+        if (__DEV__) console.log(`🔔 준비 알림 설정 완료: ${prepareTime.toLocaleString('ko-KR', { timeZone: userTimeZone })}`);
       } else {
-        if (__DEV__) console.log(`⏰ 준비 알림 시간 지남 (설정 안함): ${prepareTime.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
+        if (__DEV__) console.log(`⏰ 준비 알림 시간 지남 (설정 안함): ${prepareTime.toLocaleString('ko-KR', { timeZone: userTimeZone })}`);
       }
 
       // 2. 실행 알림 (목표 시간 +3분) - 실행 시점
@@ -231,7 +239,7 @@ export class SimpleNotificationManager {
         trigger: { date: executeTime } as any,
       });
 
-      if (__DEV__) console.log(`🎯 실행 알림 설정 완료: ${executeTime.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
+      if (__DEV__) console.log(`🎯 실행 알림 설정 완료: ${executeTime.toLocaleString('ko-KR', { timeZone: userTimeZone })}`);
       if (__DEV__) console.log(`✅ 목표 "${title}" 2단계 알림 스케줄링 완료`);
       
       // 디버깅용 - 설정된 알림 즉시 확인
