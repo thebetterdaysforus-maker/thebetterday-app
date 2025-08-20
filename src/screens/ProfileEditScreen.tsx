@@ -9,8 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient';
 
@@ -147,16 +148,22 @@ export default function ProfileEditScreen({ navigation }: ProfileEditScreenProps
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
+        <View style={{ paddingTop: useSafeAreaInsets().top }} />
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>프로필을 불러오는 중...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
+  const insets = useSafeAreaInsets();
+  
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
+      <View style={{ paddingTop: insets.top }} />
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -216,7 +223,7 @@ export default function ProfileEditScreen({ navigation }: ProfileEditScreenProps
         </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
