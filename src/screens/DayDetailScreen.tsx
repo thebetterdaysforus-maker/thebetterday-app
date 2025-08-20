@@ -6,7 +6,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import useGoalStore from "../store/goalStore";
 import useRetrospectStore from "../store/retrospectStore";
 import { useFlexibleGoalStore } from "../store/flexibleGoalStore";
@@ -222,15 +224,22 @@ export default function DayDetailScreen({ route }: any) {
   }, [date, getGoalsByDate]);
 
   /* ---------- UI ---------- */
+  const insets = useSafeAreaInsets();
+  
   if (loading)
     return (
       <View style={s.center}>
+        <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+        <View style={{ paddingTop: insets.top }} />
         <Text>Loading…</Text>
       </View>
     );
 
   return (
-    <ScrollView contentContainerStyle={s.wrap}>
+    <View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      <View style={{ paddingTop: insets.top }} />
+      <ScrollView contentContainerStyle={s.wrap}>
       {/* 날짜 헤드라인 */}
       <Text style={s.headDate}>{date}</Text>
 
@@ -434,7 +443,8 @@ export default function DayDetailScreen({ route }: any) {
       ) : (
         <Text style={s.empty}>회고 없음</Text>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
