@@ -211,7 +211,7 @@ export const NOTIFICATION_MESSAGES: NotificationMessage[] = [
   {
     id: 35,
     type: "goal",
-    message: "『{goal}』, 이 선택은 {display_name}님의 길이에요.",
+    message: "『{goal}』은 {display_name}님의 선택이에요!.",
     variables: ["goal", "display_name"],
   },
   {
@@ -223,13 +223,13 @@ export const NOTIFICATION_MESSAGES: NotificationMessage[] = [
   {
     id: 37,
     type: "goal",
-    message: "『{goal}』, 마음의 이유를 기억해주세요.",
+    message: "『{goal}』, 이유를 기억해주세요.",
     variables: ["goal"],
   },
   {
     id: 38,
     type: "goal",
-    message: "『{goal}』, 행동으로 진심을 보여줘요.",
+    message: "『{goal}』, 행동으로 진심을 보여주세요!.",
     variables: ["goal"],
   },
   {
@@ -241,7 +241,7 @@ export const NOTIFICATION_MESSAGES: NotificationMessage[] = [
   {
     id: 40,
     type: "goal",
-    message: "『{goal}』, 오늘의 결정은 빛날 거예요.",
+    message: "『{goal}』, 오늘의 결정은 훗날 빛날 거예요.",
     variables: ["goal"],
   },
   {
