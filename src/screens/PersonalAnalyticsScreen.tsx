@@ -6,7 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAnalyticsStore } from "../store/analyticsStore";
 import { useMotivationMessageStore } from "../store/motivationMessageStore";
 
@@ -82,156 +84,170 @@ const PersonalAnalyticsScreen: React.FC = () => {
     );
   }
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      {/* 개인 통계 섹션 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📊 나의 성장 분석</Text>
-
-        {statistics && (
-          <View style={styles.statsGrid}>
-            <View style={[styles.statCard, styles.primaryCard]}>
-              <Text style={styles.statNumber}>{statistics.successRate}%</Text>
-              <Text style={styles.statLabel}>전체 성공률</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{statistics.totalGoals}</Text>
-              <Text style={styles.statLabel}>총 목표 수</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{statistics.currentStreak}</Text>
-              <Text style={styles.statLabel}>연속 성공</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{statistics.bestStreak}</Text>
-              <Text style={styles.statLabel}>최고 기록</Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* 최고 성과 시간대 */}
-      {statistics && (
+    <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
+      <View style={{ paddingTop: insets.top }} />
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* 개인 통계 섹션 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎯 나의 최고 성과</Text>
+          <Text style={styles.sectionTitle}>📊 나의 성장 분석</Text>
 
-          {statistics.successGoals === 0 ? (
-            <View style={styles.noDataContainer}>
-              <Text style={styles.noDataText}>분석할 데이터가 부족합니다.</Text>
-              <Text style={styles.noDataSubText}></Text>
-            </View>
-          ) : (
-            <View style={styles.performanceGrid}>
-              <View style={styles.performanceCard}>
-                <Text style={styles.performanceLabel}>최고 시간대</Text>
-                <Text style={styles.performanceValue}>{getBestTimeSlot()}</Text>
-                <Text style={styles.performanceDetail}>
-                  {statistics.bestHour}시
-                </Text>
+          {statistics && (
+            <View style={styles.statsGrid}>
+              <View style={[styles.statCard, styles.primaryCard]}>
+                <Text style={styles.statNumber}>{statistics.successRate}%</Text>
+                <Text style={styles.statLabel}>전체 성공률</Text>
               </View>
 
-              <View style={styles.performanceCard}>
-                <Text style={styles.performanceLabel}>최고 요일</Text>
-                <Text style={styles.performanceValue}>{getBestDay()}</Text>
-                <Text style={styles.performanceDetail}>성공률 높음</Text>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{statistics.totalGoals}</Text>
+                <Text style={styles.statLabel}>총 목표 수</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>
+                  {statistics.currentStreak}
+                </Text>
+                <Text style={styles.statLabel}>연속 성공</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{statistics.bestStreak}</Text>
+                <Text style={styles.statLabel}>최고 기록</Text>
               </View>
             </View>
           )}
         </View>
-      )}
 
-      {/* 시간대별 성과 차트 */}
-      {hourlyStats.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🕐 시간대별 성과</Text>
-          <View style={styles.chartContainer}>
-            {hourlyStats.map((stat, index) => (
-              <View key={index} style={styles.chartItem}>
-                <Text style={styles.chartLabel}>{stat.hour}시</Text>
-                <View style={styles.chartBar}>
-                  <View
-                    style={[
-                      styles.chartBarFill,
-                      { width: `${stat.successRate}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.chartValue}>{stat.successRate}%</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
+        {/* 최고 성과 시간대 */}
+        {statistics && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🎯 나의 최고 성과</Text>
 
-      {/* 요일별 성과 차트 */}
-      {dailyStats.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📅 요일별 성과</Text>
-          <View style={styles.weeklyChart}>
-            {dailyStats.map((stat, index) => (
-              <View key={index} style={styles.weeklyItem}>
-                <Text style={styles.weeklyLabel}>
-                  {getDayName(stat.dayOfWeek)}
+            {statistics.successGoals === 0 ? (
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>
+                  분석할 데이터가 부족합니다.
                 </Text>
-                <View style={styles.weeklyBar}>
-                  <View
-                    style={[
-                      styles.weeklyBarFill,
-                      { height: `${stat.successRate}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.weeklyValue}>{stat.successRate}%</Text>
+                <Text style={styles.noDataSubText}></Text>
               </View>
-            ))}
-          </View>
-        </View>
-      )}
+            ) : (
+              <View style={styles.performanceGrid}>
+                <View style={styles.performanceCard}>
+                  <Text style={styles.performanceLabel}>최고 시간대</Text>
+                  <Text style={styles.performanceValue}>
+                    {getBestTimeSlot()}
+                  </Text>
+                  <Text style={styles.performanceDetail}>
+                    {statistics.bestHour}시
+                  </Text>
+                </View>
 
-      {/* 관리자 인사이트 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🏆 성공하는 사용자들의 특징</Text>
-        {adminInsights.map((insight, index) => (
-          <View key={insight.id} style={styles.adminInsightCard}>
-            <View style={styles.insightHeader}>
-              <Text style={styles.insightIcon}>
-                {insight.insightType === "pattern"
-                  ? "📊"
-                  : insight.insightType === "tip"
-                    ? "💡"
-                    : "📈"}
+                <View style={styles.performanceCard}>
+                  <Text style={styles.performanceLabel}>최고 요일</Text>
+                  <Text style={styles.performanceValue}>{getBestDay()}</Text>
+                  <Text style={styles.performanceDetail}>성공률 높음</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* 시간대별 성과 차트 */}
+        {hourlyStats.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🕐 시간대별 성과</Text>
+            <View style={styles.chartContainer}>
+              {hourlyStats.map((stat, index) => (
+                <View key={index} style={styles.chartItem}>
+                  <Text style={styles.chartLabel}>{stat.hour}시</Text>
+                  <View style={styles.chartBar}>
+                    <View
+                      style={[
+                        styles.chartBarFill,
+                        { width: `${stat.successRate}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.chartValue}>{stat.successRate}%</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* 요일별 성과 차트 */}
+        {dailyStats.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📅 요일별 성과</Text>
+            <View style={styles.weeklyChart}>
+              {dailyStats.map((stat, index) => (
+                <View key={index} style={styles.weeklyItem}>
+                  <Text style={styles.weeklyLabel}>
+                    {getDayName(stat.dayOfWeek)}
+                  </Text>
+                  <View style={styles.weeklyBar}>
+                    <View
+                      style={[
+                        styles.weeklyBarFill,
+                        { height: `${stat.successRate}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.weeklyValue}>{stat.successRate}%</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* 관리자 인사이트 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🏆 승리를 위한 꿀팁!</Text>
+          {adminInsights.map((insight, index) => (
+            <View key={insight.id} style={styles.adminInsightCard}>
+              <View style={styles.insightHeader}>
+                <Text style={styles.insightIcon}>
+                  {insight.insightType === "pattern"
+                    ? "📊"
+                    : insight.insightType === "tip"
+                      ? "💡"
+                      : "📈"}
+                </Text>
+                <Text style={styles.adminInsightTitle}>{insight.title}</Text>
+              </View>
+              <Text style={styles.insightDescription}>
+                {insight.description}
               </Text>
-              <Text style={styles.adminInsightTitle}>{insight.title}</Text>
             </View>
-            <Text style={styles.insightDescription}>{insight.description}</Text>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
 
-      {/* 동기부여 섹션 */}
-      {currentMessage && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{currentMessage.title}</Text>
-          <View style={styles.motivationCard}>
-            <View style={styles.characterSection}>
-              <View style={styles.characterContent}>
-                <Text style={styles.motivationMessage}>
-                  {currentMessage.message}
-                </Text>
+        {/* 동기부여 섹션 */}
+        {currentMessage && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{currentMessage.title}</Text>
+            <View style={styles.motivationCard}>
+              <View style={styles.characterSection}>
+                <View style={styles.characterContent}>
+                  <Text style={styles.motivationMessage}>
+                    {currentMessage.message}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-      )}
-    </ScrollView>
+        )}
+      </ScrollView>
+    </View>
   );
 };
 
