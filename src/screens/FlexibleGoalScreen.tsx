@@ -8,7 +8,9 @@ import {
   TextInput,
   Alert,
   RefreshControl,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFlexibleGoalStore } from "../store/flexibleGoalStore";
 import { getTodayString } from "../utils/dateHelpers";
 import { getTodayKorea, getTomorrowKorea } from "../utils/timeUtils";
@@ -177,15 +179,20 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
     );
   };
 
+  const insets = useSafeAreaInsets();
+  
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>필수 목표</Text>
+    <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
+      <View style={{ paddingTop: insets.top }} />
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>필수 목표</Text>
         <Text style={styles.headerSubtitle}>
           시간에 얽매이지 않고 오늘 달성하고 싶은 목표를 적어주세요!
         </Text>
@@ -206,7 +213,8 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
           포함되지 않습니다
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
