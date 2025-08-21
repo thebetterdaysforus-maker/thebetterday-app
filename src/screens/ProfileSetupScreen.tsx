@@ -189,7 +189,7 @@ export default function ProfileSetupScreen({ route }: any) {
     }
   };
 
-  console.log("🔍 ProfileSetupScreen 렌더링됨 - 게스트 모드에서 진입");
+  if (__DEV__) console.log("🔍 ProfileSetupScreen 렌더링됨");
 
   /* 저장 */
   const [isSaving, setIsSaving] = useState(false);
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 2,
   },
 
   tutorialButtonText: {
