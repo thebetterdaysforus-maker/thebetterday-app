@@ -150,7 +150,7 @@ export default function ProfileEditScreen({ navigation }: ProfileEditScreenProps
     return (
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-        <View style={{ paddingTop: useSafeAreaInsets().top }} />
+        <View style={{ paddingTop: Math.max(useSafeAreaInsets().top, 44) }} />
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>프로필을 불러오는 중...</Text>
         </View>
