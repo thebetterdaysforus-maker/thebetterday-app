@@ -123,8 +123,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
+    paddingTop: 50,
+    paddingBottom: 10,
   },
   backButton: {
     marginRight: 20,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 40,
+    paddingHorizontal: 20,
   },
   iconContainer: {
     width: 100,
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   featureItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 20,
     paddingHorizontal: 20,
   },
   featureIcon: {
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     paddingHorizontal: 40,
-    paddingBottom: 40,
+    paddingBottom: 80,
   },
   primaryButton: {
     height: 56,
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 15,
   },
   secondaryButton: {
     height: 56,
