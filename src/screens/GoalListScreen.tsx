@@ -1,8 +1,9 @@
 // src/screens/GoalListScreen.tsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import {
   Alert,
   AppState,
+  AppStateStatus,
   Button,
   SectionList,
   SectionListData,
@@ -32,8 +33,10 @@ import useCommunityStore from "../store/communityStore";
 import { useFlexibleGoalStore } from "../store/flexibleGoalStore";
 import { useAppLifecycle } from "../hooks/useAppLifecycle";
 import { registerGlobalDebugFunctions } from "../utils/globalDebugFunctions";
+import { FLATLIST_OPTIMIZATION_PROPS } from "../utils/performanceOptimizer";
+import { useOptimizedGoals } from "../hooks/useOptimizedGoals";
 
-import { getTodayKorea, getTomorrowKorea } from "../utils/timeUtils";
+import { getTodayKorea, getTomorrowKorea, getKoreaTime } from "../utils/timeUtils";
 import { getBadgeImage } from "../utils/badgeImageMap";
 import { DailyStreakManager } from "../utils/streakBadgeSystem";
 // 스타일 상수 제거
@@ -46,16 +49,9 @@ const ymd = (d: Date | string) =>
   (typeof d === "string" ? d : d.toISOString()).slice(0, 10);
 // 실시간으로 날짜 계산 (컴포넌트 렌더링 시마다 갱신)
 const getCurrentDateKeys = () => {
-  // 강제로 현재 한국 시간 계산
-  const now = new Date();
-  const koreaOffset = 9 * 60; // KST는 UTC+9
-  const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
-  const koreaTime = new Date(utcTime + koreaOffset * 60000);
-
-  const todayKey = koreaTime.toISOString().slice(0, 10);
-  const tomorrowKey = new Date(koreaTime.getTime() + 86400000)
-    .toISOString()
-    .slice(0, 10);
+  // 수정된 timeUtils 함수를 사용
+  const todayKey = getTodayKorea();
+  const tomorrowKey = getTomorrowKorea();
 
   return { todayKey, tomorrowKey };
 };
@@ -258,20 +254,21 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
     return unsubscribe;
   }, [navigation, fetchProfile, fetchGoals]);
 
-  /* ───── 하이브리드 실시간 상태 업데이트 ───── */
+  /* ───── 성능 최적화된 상태 업데이트 ───── */
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
   const [appState, setAppState] = useState(AppState.currentState);
   const intervalRef = useRef<number | null>(null);
 
-  // 앱 상태 변화 감지
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (nextAppState) => {
-      console.log("🔄 앱 상태 변화:", appState, "→", nextAppState);
-      setAppState(nextAppState);
-    });
-
-    return () => subscription?.remove();
+  // 앱 상태 변화 감지 (메모이제이션)
+  const handleAppStateChange = useCallback((nextAppState: AppStateStatus) => {
+    console.log("🔄 앱 상태 변화:", appState, "→", nextAppState);
+    setAppState(nextAppState);
   }, [appState]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription?.remove();
+  }, [handleAppStateChange]);
 
   // 하이브리드 간격 시스템
   useEffect(() => {
@@ -393,19 +390,16 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       if (goalCount === 0) return "수행 목록";
 
       if (isToday) {
-        // 오늘 목표: 현재 시간과 목표 시간 비교
-        const now = new Date();
-        const koreaTime = new Date(
-          now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
-        );
+        // 오늘 목표: 현재 한국 시간과 목표 시간 비교 (정확한 한국 시간 사용)
+        const koreaTime = getKoreaTime(); // timeUtils의 정확한 한국 시간 함수 사용
 
         const hasPassedGoals = todayGoals.some((goalItem) => {
           const goalTime = new Date(goalItem.goal.target_time);
           return goalTime.getTime() <= koreaTime.getTime();
         });
 
-        // 목표 시간이 하나라도 지났으면 "수행 목록", 모두 미래면 "수행 예정 목록"
-        return hasPassedGoals ? "수행 목록" : "수행 예정 목록";
+        // 오늘 목표가 있으면 항상 "수행 목록"으로 표시 (시간 경과 여부와 관계없이)
+        return "수행 목록";
       } else {
         // 내일 목표: 항상 "수행 예정 목록"
         return "수행 예정 목록";
@@ -488,14 +482,14 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
   const canWriteToday = !todayRetrospectExists;
   const canWriteTomorrow = todayRetrospectExists;
 
-  /* 꿈 편집 핸들러 */
-  const handleStartEditDream = () => {
+  /* 꿈 편집 핸들러 (최적화) */
+  const handleStartEditDream = useCallback(() => {
     const currentDream = profile?.dream || "";
     setDreamText(currentDream);
     setIsEditingDream(true);
-  };
+  }, [profile?.dream]);
 
-  const handleSaveDream = async () => {
+  const handleSaveDream = useCallback(async () => {
     try {
       // 키보드 먼저 닫기
       Keyboard.dismiss();
@@ -515,14 +509,14 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       console.error("꿈 저장 실패:", error);
       Alert.alert("오류", "꿈 저장에 실패했습니다. 다시 시도해주세요.");
     }
-  };
+  }, [profile, dreamText, updateDream]);
 
-  const handleCancelDream = () => {
+  const handleCancelDream = useCallback(() => {
     // 키보드 먼저 닫기
     Keyboard.dismiss();
     setIsEditingDream(false);
     setDreamText("");
-  };
+  }, []);
 
   /* 각오 편집 핸들러 */
   const handleWriteResolution = () => {
@@ -583,15 +577,15 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
     ]);
   };
 
-  /* 메모 관련 핸들러 */
-  const handleAddMemo = (goalId: string) => {
+  /* 메모 관련 핸들러 (최적화) */
+  const handleAddMemo = useCallback((goalId: string) => {
     const goal = goals.find((g) => g.id === goalId);
     if (!goal) return;
 
     setSelectedGoalId(goalId);
     setMemoText(goal.achievement_memo || "");
     setMemoModalVisible(true);
-  };
+  }, [goals]);
 
   const handleSaveMemo = async () => {
     if (!selectedGoalId) return;
@@ -613,14 +607,14 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
     setMemoText("");
   };
 
-  /* 목표 체크 */
-  const handleCheckGoal = async (goalId: string) => {
+  /* 목표 체크 (최적화) */
+  const handleCheckGoal = useCallback(async (goalId: string) => {
     const goal = goals.find((g) => g.id === goalId);
     if (!goal) return;
 
     // 기존 checkGoal 함수 호출 (뱃지 시스템은 goalStore에서 자동 처리됨)
     await checkGoal(goalId);
-  };
+  }, [goals, checkGoal]);
 
   /* ───── Header Component ───── */
   const headerComponent = (
@@ -732,15 +726,6 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       {/* 각오 섹션 - 항상 표시 */}
       <View style={styles.resolutionAlwaysSection}>
         <View style={styles.resolutionSectionContainer}>
-          {/* 작성된 각오 표시 */}
-          {myResolution && (
-            <View style={styles.resolutionContainer}>
-              <Text style={styles.resolutionWriteButtonText}>
-                {myResolution.content}
-              </Text>
-            </View>
-          )}
-
           {/* 각오 작성하기 버튼 */}
           {!myResolution && (
             <View style={styles.resolutionContainer}>
