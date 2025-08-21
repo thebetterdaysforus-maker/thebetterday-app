@@ -25,6 +25,7 @@ interface DailyStatsRow {
 
 export default function DayDetailScreen({ route }: any) {
   const date = route.params.date as string; // YYYY-MM-DD
+  const insets = useSafeAreaInsets();
 
   /* ---------- store ---------- */
   const { goals, fetchGoals } = useGoalStore();
@@ -48,7 +49,7 @@ export default function DayDetailScreen({ route }: any) {
       return { level: "Trans", color: "#fff", bgColor: "#1a237e" };
     if (rate >= 70) return { level: "Good", color: "#fff", bgColor: "#2e7d32" };
     if (rate >= 30) return { level: "SoSo", color: "#fff", bgColor: "#f57c00" };
-    return { level: "Bad", color: "#fff", bgColor: "#d32f2f" };
+    return { level: "Unlucky", color: "#fff", bgColor: "#d32f2f" };
   };
 
   /* ---------- fetch ---------- */
@@ -224,8 +225,6 @@ export default function DayDetailScreen({ route }: any) {
   }, [date, getGoalsByDate]);
 
   /* ---------- UI ---------- */
-  const insets = useSafeAreaInsets();
-  
   if (loading)
     return (
       <View style={s.center}>
@@ -387,19 +386,19 @@ export default function DayDetailScreen({ route }: any) {
             day: "2-digit",
           });
 
-          if (date === tomorrowKey) return "필수 목표";
-          if (date === todayKey) return "필수 목표";
+          if (date === tomorrowKey) return "자유 목표";
+          if (date === todayKey) return "자유 목표";
 
           // 과거 날짜
           const targetDate = new Date(date);
           const dayOfWeek = targetDate.toLocaleDateString("ko-KR", {
             weekday: "short",
           });
-          return `${dayOfWeek}의 필수 목표`;
+          return `${dayOfWeek}의 자유 목표`;
         })()}
       </Text>
       {flexibleGoals.length === 0 ? (
-        <Text style={s.empty}>필수 목표 없음</Text>
+        <Text style={s.empty}>자유 목표 없음</Text>
       ) : (
         flexibleGoals.map((g) => (
           <View key={g.id} style={s.goalContainer}>
