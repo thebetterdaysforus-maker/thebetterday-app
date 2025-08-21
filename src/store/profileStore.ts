@@ -46,25 +46,43 @@ const useProfileStore = create<ProfileState>((set) => ({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
-    const profile: any = {
-      id: session.user.id,
-      display_name,
-      dream,
-      created_at: new Date().toISOString(),
-    };
+    try {
+      const profile: any = {
+        id: session.user.id,
+        display_name,
+        dream,
+        created_at: new Date().toISOString(),
+      };
 
-    // referrer가 제공되면 추가
-    if (referrer) {
-      profile.referrer = referrer;
+      // referrer가 제공되면 추가
+      if (referrer) {
+        profile.referrer = referrer;
+      }
+
+      // profiles 테이블의 id 컬럼이 이미 auth.users를 참조하므로 별도 users 테이블 불필요
+
+      const { error } = await supabase
+        .from('profiles')
+        .upsert([profile]);
+
+      if (error) {
+        console.error('프로필 저장 오류:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw new Error(`프로필 저장 실패: ${error.message}`);
+      }
+
+      set({ profile });
+    } catch (error: any) {
+      console.error('프로필 저장 중 오류:', {
+        message: error?.message || '알 수 없는 오류',
+        stack: error?.stack
+      });
+      throw error;
     }
-
-    const { error } = await supabase
-      .from('profiles')
-      .upsert([profile]);
-
-    if (error) throw error;
-
-    set({ profile });
   },
 
   updateDream: async (dream: string) => {
