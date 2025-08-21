@@ -22,11 +22,7 @@ import useGoalStore from "../store/goalStore";
 import useRetrospectStore from "../store/retrospectStore";
 import useCommunityStore from "../store/communityStore";
 import { useFlexibleGoalStore } from "../store/flexibleGoalStore";
-import {
-  SUPPORTED_TIMEZONES,
-  getCurrentTimeZone,
-  setCurrentTimeZone,
-} from "../utils/timeUtils";
+// 시간대 설정 기능 제거됨
 
 interface SettingsScreenProps {
   navigation: any;
@@ -51,14 +47,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     soundEnabled: true,
     vibrationEnabled: true,
   });
-  const [currentTimeZone, setCurrentTimeZoneState] = useState("Asia/Seoul");
-  const [showTimeZonePicker, setShowTimeZonePicker] = useState(false);
+  // 시간대 설정 기능 제거됨 - 한국 시간으로 고정
   const [showSoundModeModal, setShowSoundModeModal] = useState(false);
 
   useEffect(() => {
     loadProfile();
     loadNotificationSettings();
-    loadTimeZoneSettings();
   }, []);
 
   // 프로필 업데이트 후 새로고침
@@ -194,31 +188,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     setShowSoundModeModal(false);
   };
 
-  // 시간대 설정 로드
-  const loadTimeZoneSettings = async () => {
-    try {
-      const timeZone = await getCurrentTimeZone();
-      setCurrentTimeZoneState(timeZone);
-    } catch (error) {
-      console.error("시간대 설정 로드 실패:", error);
-    }
-  };
+  // 시간대 설정 로드 함수 제거됨
 
-  // 시간대 변경
-  const handleTimeZoneChange = async (timeZone: string) => {
-    try {
-      await setCurrentTimeZone(timeZone);
-      setCurrentTimeZoneState(timeZone);
-      setShowTimeZonePicker(false);
-      Alert.alert(
-        "설정 완료",
-        `시간대가 ${SUPPORTED_TIMEZONES[timeZone as keyof typeof SUPPORTED_TIMEZONES].name}로 변경되었습니다.`,
-      );
-    } catch (error) {
-      console.error("시간대 설정 실패:", error);
-      Alert.alert("오류", "시간대 설정 중 오류가 발생했습니다.");
-    }
-  };
+  // 시간대 설정 기능 제거됨
 
   const handleLogout = async () => {
     Alert.alert("로그아웃", "정말로 로그아웃하시겠습니까?", [
@@ -243,6 +215,29 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
   const handleDeleteAccount = async () => {
     navigation.navigate("AccountDeletionSurvey");
+  };
+
+  const handleContactUs = () => {
+    const contactUrl = "https://walla.my/survey/HDoAUveAmQIEnLRnGDbY";
+    Alert.alert(
+      "문의하기",
+      "외부 설문 페이지로 이동하여 의견이나 문의사항을 전달할 수 있습니다.",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "이동하기",
+          onPress: () => {
+            // React Native에서 외부 URL 열기
+            import('expo-web-browser').then((WebBrowser) => {
+              WebBrowser.openBrowserAsync(contactUrl);
+            }).catch((error) => {
+              console.error("웹브라우저 열기 실패:", error);
+              Alert.alert("오류", "웹페이지를 열 수 없습니다.");
+            });
+          }
+        }
+      ]
+    );
   };
 
   // 전체 데이터 초기화
@@ -435,17 +430,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   };
 
   const showTermsOfService = () => {
-    navigation.navigate("WebView", {
-      url: "https://www.notion.so/2418f860031d80789588dac58ad3d624",
-      title: "이용약관",
-    });
+    Alert.alert("이용약관", "이용약관은 웹사이트에서 확인하실 수 있습니다.\nhttps://www.notion.so/2418f860031d80789588dac58ad3d624");
   };
 
   const showPrivacyPolicy = () => {
-    navigation.navigate("WebView", {
-      url: "https://www.notion.so/2418f860031d8006b232f13ed101cc77",
-      title: "개인정보 처리방침",
-    });
+    Alert.alert("개인정보 처리방침", "개인정보 처리방침은 웹사이트에서 확인하실 수 있습니다.\nhttps://www.notion.so/2418f860031d8006b232f13ed101cc77");
   };
 
   // 커스텀 스위치 컴포넌트
@@ -557,20 +546,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           />
         </View>
 
-        {/* 시간대 설정 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>시간대</Text>
-          <SettingItem
-            title="현재 시간대"
-            subtitle={
-              SUPPORTED_TIMEZONES[
-                currentTimeZone as keyof typeof SUPPORTED_TIMEZONES
-              ]?.name || currentTimeZone
-            }
-            icon="time"
-            onPress={() => setShowTimeZonePicker(true)}
-          />
-        </View>
+        {/* 시간대 설정 섹션 제거됨 - 한국 시간 고정 */}
 
         {/* 알림 설정 */}
         <View style={styles.section}>
@@ -646,6 +622,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             icon="shield-checkmark"
             onPress={() => showPrivacyPolicy()}
           />
+          <SettingItem
+            title="문의하기"
+            subtitle="의견이나 문의사항을 전달해주세요"
+            icon="mail"
+            onPress={() => handleContactUs()}
+          />
         </View>
 
         {/* 계정 관리 - 게스트가 아닌 경우에만 표시 */}
@@ -706,61 +688,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         </View>
       </ScrollView>
 
-      {/* 시간대 선택 모달 */}
-      <Modal
-        visible={showTimeZonePicker}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowTimeZonePicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>시간대 선택</Text>
-              <TouchableOpacity
-                onPress={() => setShowTimeZonePicker(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.timeZoneList}>
-              {Object.entries(SUPPORTED_TIMEZONES).map(([timeZone, info]) => (
-                <TouchableOpacity
-                  key={timeZone}
-                  style={[
-                    styles.timeZoneItem,
-                    currentTimeZone === timeZone && styles.selectedTimeZone,
-                  ]}
-                  onPress={() => handleTimeZoneChange(timeZone)}
-                >
-                  <View>
-                    <Text
-                      style={[
-                        styles.timeZoneName,
-                        currentTimeZone === timeZone && styles.selectedText,
-                      ]}
-                    >
-                      {info.name}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.timeZoneOffset,
-                        currentTimeZone === timeZone && styles.selectedText,
-                      ]}
-                    >
-                      UTC {info.offset}
-                    </Text>
-                  </View>
-                  {currentTimeZone === timeZone && (
-                    <Ionicons name="checkmark" size={20} color="#007AFF" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      {/* 시간대 선택 모달 제거됨 - 한국 시간으로 고정 */}
 
       {/* 사운드 모드 선택 모달 */}
       <Modal
