@@ -65,6 +65,18 @@ const getYesterdayString = () => {
   return koreaTimeString;
 };
 
+const getTodayStringForResolution = () => {
+  // 각오 표시용 - 당일 각오를 가져오기 위함
+  const now = new Date();
+  const koreaTimeString = now.toLocaleString("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return koreaTimeString;
+};
+
 const getTomorrowString = () => {
   // 한국 시간 기준으로 내일 날짜 반환 (Date value out of bounds 오류 방지)
   const now = new Date();
@@ -93,7 +105,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
   fetchMyResolution: async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const today = getTodayString(); // 오늘 날짜 기준으로 조회 (각오는 당일에 표시되어야 함)
+      const today = getTodayStringForResolution(); // 오늘 날짜 기준으로 조회 (각오는 당일에 표시되어야 함)
       
       if (session) {
         // 정식 회원 - Supabase에서 조회
@@ -122,15 +134,40 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
   saveMyResolution: async (content: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const today = getTodayString(); // 오늘 날짜로 저장 (각오는 당일 작성)
+      const today = getTodayStringForResolution(); // 오늘 날짜로 저장 (각고는 당일 작성)
       
-      // 로그인 사용자든 게스트든 모두 Supabase 사용
-      const userId = session?.user?.id || `guest_${nanoid()}`;
+      if (!session) {
+        throw new Error('게스트 모드에서는 각고를 작성할 수 없습니다.\n회원가입 후 이용해주세요.');
+      }
+
+      // 프로필 존재 확인 및 자동 생성 (goalStore와 동일한 로직)
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!existingProfile) {
+        console.log("🔄 게스트 사용자 프로필 없음 - 자동 생성 시작");
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: session.user.id,
+            display_name: `게스트${Math.random().toString(36).substr(2, 4)}`,
+            created_at: new Date().toISOString()
+          });
+        
+        if (profileError) {
+          console.error("❌ 프로필 생성 실패:", profileError);
+          throw new Error("프로필 생성에 실패했습니다. 다시 시도해주세요.");
+        }
+        console.log("✅ 게스트 사용자 프로필 생성 완료");
+      }
       
       const { data, error } = await supabase
         .from('daily_resolutions')
         .insert([{
-          user_id: userId,
+          user_id: session.user.id,
           content,
           date: today,
         }])
@@ -138,23 +175,28 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
         .single();
 
       if (error) {
-        console.error('🚫 Supabase 각오 저장 오류 (상세):', {
+        console.error('🚫 Supabase 각고 저장 오류 (상세):', {
           errorCode: error.code,
           errorMessage: error.message,
           errorDetails: error.details,
           errorHint: error.hint,
           targetDate: today,
-          userId: userId,
+          userId: session.user.id,
           isGuest: !session,
           content: content?.substring(0, 50) + '...'
         });
+        
+        // 외래키 제약 조건 위반 처리 (사용자가 profiles 테이블에 없는 경우)
+        if (error.code === '23503') {
+          throw new Error('회원 정보가 완전하지 않습니다.\n프로필 설정을 완료한 후 다시 시도해주세요.');
+        }
         
         if (error.code === '23505') {
           // 중복 오류 시 기존 데이터 조회해서 수정 모드로 전환
           const { data: existingData } = await supabase
             .from('daily_resolutions')
             .select('*')
-            .eq('user_id', userId)
+            .eq('user_id', session.user.id)
             .eq('date', today)
             .single();
           
@@ -174,10 +216,8 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
 
       set({ myResolution: data });
       
-      // 로그인 사용자만 커뮤니티 목록 새로고침 (게스트는 건너뜀)
-      if (session) {
-        await get().refreshResolutions();
-      }
+      // 커뮤니티 목록 새로고침
+      await get().refreshResolutions();
     } catch (error) {
       console.error('🚫 각오 저장 실패:', error);
       
@@ -217,11 +257,8 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
 
       set({ myResolution: data });
       
-      // 로그인 사용자만 커뮤니티 목록 새로고침 (게스트는 건너뜀)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await get().refreshResolutions();
-      }
+      // 커뮤니티 목록 새로고침
+      await get().refreshResolutions();
     } catch (error) {
       console.error('각오 수정 실패:', error);
       throw error;
@@ -243,11 +280,8 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
 
       set({ myResolution: null });
       
-      // 로그인 사용자만 커뮤니티 목록 새로고침 (게스트는 건너뜀)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await get().refreshResolutions();
-      }
+      // 커뮤니티 목록 새로고침
+      await get().refreshResolutions();
     } catch (error) {
       console.error('각오 삭제 실패:', error);
       throw error;
