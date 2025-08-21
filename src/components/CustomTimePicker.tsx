@@ -108,9 +108,12 @@ export default function CustomTimePicker({
     });
     
     if (!isTomorrowMode) {
-      // 한국 시간 기준으로 당일 여부 확인
-      const koreanNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
-      const testDateKorean = new Date(testDate.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+      // UTC 오프셋 방식으로 안정적인 한국 시간 계산
+      const utcNow = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const koreanNow = new Date(utcNow + (9 * 60 * 60 * 1000));
+      
+      const utcTest = testDate.getTime() + (testDate.getTimezoneOffset() * 60000);
+      const testDateKorean = new Date(utcTest + (9 * 60 * 60 * 1000));
       
       // 같은 날짜인지 확인 (한국 시간 기준)
       const isSameDay = koreanNow.toDateString() === testDateKorean.toDateString();
