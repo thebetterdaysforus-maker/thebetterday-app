@@ -3,17 +3,14 @@ import React from 'react';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProfileSetupScreen from '../screens/ProfileSetupScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
-import WebViewScreen from '../screens/WebViewScreen';
+
 import AccountDeletionSurveyScreen from '../screens/AccountDeletionSurveyScreen';
 
 export type SettingsStackParamList = {
   SettingsMain: undefined;
   ProfileSetup: undefined;
   ProfileEdit: undefined;
-  WebView: {
-    url: string;
-    title: string;
-  };
+
   AccountDeletionSurvey: undefined;
 };
 
@@ -29,7 +26,7 @@ export default function SettingsStack() {
       <Stack.Screen name="SettingsMain" component={SettingsScreen} />
       <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
       <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
-      <Stack.Screen name="WebView" component={WebViewScreen} />
+
       <Stack.Screen name="AccountDeletionSurvey" component={AccountDeletionSurveyScreen} />
     </Stack.Navigator>
   );
