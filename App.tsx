@@ -1,7 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState, useRef, ErrorInfo } from 'react';
-import { View, Text, StyleSheet, Alert, TextInput, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, Alert, TextInput, Platform, Image, SafeAreaView, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Font from 'expo-font';
@@ -219,9 +219,8 @@ function MainApp() {
           setSupabaseStatus(healthCheck);
           
           if (!healthCheck.isConnected) {
-            console.warn('⚠️ Supabase 연결 실패 - 오프라인 모드');
-            setInitError('서버 연결에 실패했습니다. WiFi나 모바일 데이터를 확인해주세요.');
-            // 연결 실패해도 앱은 계속 진행
+            console.error('❌ Supabase 연결 필수 - 앱 사용 불가');
+            setInitError('서버 연결에 실패했습니다.\n\nWiFi나 모바일 데이터를 확인하고\n앱을 다시 시작해주세요.');
             setLoading(false);
             return;
           }
@@ -252,10 +251,9 @@ function MainApp() {
           }
         } catch (supabaseError) {
           APKErrorReporter.report(supabaseError, 'supabase_connection');
-          console.log('⚠️ Supabase 연결 실패 (오프라인 모드):', supabaseError);
+          console.error('❌ Supabase 연결 필수 - 앱 사용 불가:', supabaseError);
           setSupabaseStatus({ isConnected: false, canAuth: false, canRead: false });
-          setInitError('서버 연결에 실패했습니다. WiFi나 모바일 데이터를 확인해주세요.');
-          // 연결 실패해도 앱은 계속 진행
+          setInitError('서버 연결에 실패했습니다.\n\nWiFi나 모바일 데이터를 확인하고\n앱을 다시 시작해주세요.');
           setLoading(false);
         }
       } catch (error) {
@@ -290,6 +288,7 @@ function MainApp() {
 
   // 스플래시 스크린 비활성화됨
 
+  // 로딩 화면
   if (loading || !fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
@@ -304,13 +303,48 @@ function MainApp() {
         <Text style={styles.loadingSubtext}>
           {!fontsLoaded ? '폰트 로딩 중...' : '로딩 중...'}
         </Text>
-        {initError && (
-          <Text style={styles.errorText}>{initError}</Text>
-        )}
-        {!supabaseStatus.isConnected && !loading && (
-          <Text style={styles.warningText}>오프라인 모드로 일부 기능이 제한됩니다</Text>
-        )}
       </View>
+    );
+  }
+
+  // 네트워크 연결 오류 화면 (앱 재시작 필요)
+  if (initError) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff', padding: 24 }}>
+        <StatusBar style="dark" />
+        <Text style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 16, color: '#ff4444' }}>
+          연결 오류
+        </Text>
+        <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 32, lineHeight: 24, color: '#333' }}>
+          {initError}
+        </Text>
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#6366f1',
+            paddingHorizontal: 32,
+            paddingVertical: 16,
+            borderRadius: 8,
+            minWidth: 200
+          }}
+          onPress={async () => {
+            // 앱 재시작
+            setLoading(true);
+            setInitError('');
+            // initializeAuth 함수를 다시 실행
+            await new Promise(resolve => setTimeout(resolve, 100));
+            if (typeof window !== 'undefined' && window.location?.reload) {
+              window.location.reload();
+            } else {
+              setLoading(false);
+              Alert.alert('재시도', '앱을 수동으로 재시작해주세요.');
+            }
+          }}
+        >
+          <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold', textAlign: 'center' }}>
+            다시 시도
+          </Text>
+        </TouchableOpacity>
+      </SafeAreaView>
     );
   }
 
