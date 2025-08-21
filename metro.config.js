@@ -30,6 +30,11 @@ config.resolver.alias = {
   '@supabase/node-fetch': require.resolve('cross-fetch'),
   'node-fetch': require.resolve('cross-fetch'),
   'stream': require.resolve('stream-browserify'),
+  // Supabase 의존성 해결
+  '@supabase/postgrest-js': '@supabase/postgrest-js',
+  '@supabase/gotrue-js': '@supabase/gotrue-js',
+  '@supabase/realtime-js': '@supabase/realtime-js',
+  '@supabase/storage-js': '@supabase/storage-js',
 };
 
 // Package Exports 비활성화 - date-fns 호환성 문제 해결
