@@ -4,6 +4,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import React, { useState } from "react";
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import useGoalStore from "../store/goalStore";
 import CustomTimePicker from "../components/CustomTimePicker";
 
@@ -37,6 +38,8 @@ const tomorrowEnd = (): Date => {
 };
 
 export default function TimeSelectScreen({ navigation, route }: any) {
+  const insets = useSafeAreaInsets();
+  
   /* 오늘 vs 내일 모드 - 기본값은 "today"로 당일 추가 모드 */
   const isTomorrow = route.params?.initial === "tomorrow";
   const isToday = route.params?.initial === "today";
@@ -116,6 +119,19 @@ export default function TimeSelectScreen({ navigation, route }: any) {
     });
     
     if (!isTomorrow && !isTimeReset) {
+      // 🌙 23:30 이후 당일 목표 설정 제한 체크 (3시간 제한보다 우선)
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      
+      if (currentHour === 23 && currentMinute >= 30) {
+        console.log("❌ 23:30 이후 당일 목표 설정 제한 위반");
+        Alert.alert(
+          '당일 목표 설정 마감',
+          '오후 11시 30분 이후에는 당일 목표를 설정할 수 없습니다.\n\n내일 목표로 설정해 주세요.'
+        );
+        return;
+      }
+      
       // 🔥 새 목표 모드 3시간 제한 활성화 (당일만)
       const minAllowedTime = new Date(now.getTime() + 3 * 60 * 60 * 1000);
       if (targetTime <= minAllowedTime) {
@@ -217,15 +233,41 @@ export default function TimeSelectScreen({ navigation, route }: any) {
 
     console.log("✅ 30분 충돌 없음 - 저장 진행");
 
-    // 시간 재설정 모드인 경우 이전 화면으로 돌아가면서 변경된 시간 전달
+    // 시간 재설정 모드인 경우 원래 날짜를 보존하면서 시간만 변경
     if (isTimeReset) {
-      console.log('🔄 시간 재설정 모드 - 변경된 시간으로 돌아가기:', selectedTimeISO);
-      navigation.navigate("GoalDetail", {
-        goalId: goalId,
-        prefilledTime: selectedTimeISO,
-        updatedTime: selectedTimeISO, // 변경된 시간 전달
-        batch: route.params?.batch ?? false,
-      });
+      console.log('🔄 시간 재설정 모드 - 원래 날짜 보존하여 시간 변경');
+      
+      // 기존 목표의 날짜를 가져와서 새로운 시간과 결합
+      const existingGoal = goals.find(g => g.id === goalId);
+      if (existingGoal) {
+        const existingDate = new Date(existingGoal.target_time);
+        const newDateTime = new Date(targetTime);
+        
+        // 기존 날짜에 새로운 시간 적용
+        existingDate.setHours(newDateTime.getHours(), newDateTime.getMinutes(), 0, 0);
+        const preservedDateTime = existingDate.toISOString();
+        
+        console.log('📅 날짜 보존 처리:', {
+          기존시간: existingGoal.target_time,
+          선택시간: targetTime.toISOString(),
+          보존결과: preservedDateTime
+        });
+        
+        navigation.navigate("GoalDetail", {
+          goalId: goalId,
+          prefilledTime: preservedDateTime,
+          updatedTime: preservedDateTime,
+          batch: route.params?.batch ?? false,
+        });
+      } else {
+        // 기존 목표를 찾을 수 없는 경우 선택한 시간 그대로 사용
+        navigation.navigate("GoalDetail", {
+          goalId: goalId,
+          prefilledTime: selectedTimeISO,
+          updatedTime: selectedTimeISO,
+          batch: route.params?.batch ?? false,
+        });
+      }
     } else {
       // 수행 목록 추가 모드
       navigation.navigate("GoalDetail", {
@@ -237,7 +279,7 @@ export default function TimeSelectScreen({ navigation, route }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 44) }]}>
       {/* 헤더 */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
