@@ -24,6 +24,7 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
   navigation,
   route,
 }) => {
+  const insets = useSafeAreaInsets();
   const {
     fetchGoals,
     addGoal,
@@ -118,7 +119,7 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
       <View style={styles.goalSection}>
         <View style={styles.goalHeader}>
           <Text style={styles.goalTypeIcon}>🎯</Text>
-          <Text style={styles.goalTypeTitle}>필수 목표</Text>
+          <Text style={styles.goalTypeTitle}>자유 목표</Text>
           <Text style={styles.goalCount}>{hasGoal ? `1/1` : "0/1"}</Text>
         </View>
 
@@ -179,12 +180,10 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
     );
   };
 
-  const insets = useSafeAreaInsets();
-  
   return (
     <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-      <View style={{ paddingTop: insets.top }} />
+      <View style={{ paddingTop: Math.max(insets.top, 44) }} />
       <ScrollView
         style={styles.container}
         refreshControl={
@@ -192,12 +191,11 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
         }
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>필수 목표</Text>
         <Text style={styles.headerSubtitle}>
           시간에 얽매이지 않고 오늘 달성하고 싶은 목표를 적어주세요!
         </Text>
         <Text style={styles.noticeText}>
-          📌 필수 목표는 당일 기준으로만 적용됩니다!
+          📌 자유 목표는 당일 기준으로만 적용됩니다!
         </Text>
       </View>
 
@@ -208,7 +206,7 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
       <View style={styles.helpSection}>
         <Text style={styles.helpTitle}>💡 사용 팁</Text>
         <Text style={styles.helpText}>
-          • 하루에 하나의 필수 목표만 설정 가능합니다{"\n"}• 당일에만 설정할 수
+          • 하루에 하나의 자유 목표만 설정 가능합니다{"\n"}• 당일에만 설정할 수
           있습니다{"\n"}• 예시: 독서 50페이지 이상 읽기{"\n"}• DB에는
           포함되지 않습니다
         </Text>
@@ -229,16 +227,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 4,
-  },
+
   headerSubtitle: {
     fontSize: 13,
     color: "#666",
     marginBottom: 10,
+    marginTop : 20,
   },
   noticeText: {
     fontSize: 12,
