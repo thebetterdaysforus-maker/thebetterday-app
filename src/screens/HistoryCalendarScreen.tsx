@@ -18,7 +18,7 @@ const labelOf = (rate: number) =>
   rate === 100 ? { txt: 'Trans', color: '#1E3A8A' }
   : rate >= 70 ? { txt: 'Good',      color: 'seagreen' }
   : rate >= 30 ? { txt: 'SoSo',      color: '#E67E22' }
-               : { txt: 'Bad',       color: 'crimson' };
+               : { txt: 'Unlucky',       color: 'crimson' };
 
 /* ───────── 셀 컴포넌트 ───────── */
 interface CellProps {
@@ -56,11 +56,13 @@ const Cell = memo(({ date, meta, onPress }: CellProps) => {
 
 /* ───────── 메인 ───────── */
 export default function HistoryCalendarScreen() {
+  // Hook 호출 순서를 절대적으로 고정 - 조건부 호출 금지
   const nav = useNavigation<NavProp>();
-  const [meta,    setMeta]    = useState<Record<string, { rate: number; hasRetro: boolean }>>({});
+  const insets = useSafeAreaInsets(); // 항상 최상단에서 호출
+  const [meta, setMeta] = useState<Record<string, { rate: number; hasRetro: boolean }>>({});
   const [loading, setLoading] = useState(true);
-
-  /* ---------- 데이터 로딩 ---------- */
+  
+  // useEffect도 항상 동일한 순서로 호출
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -91,14 +93,14 @@ export default function HistoryCalendarScreen() {
       const flexibleGoals = flexibleGoalsRaw ?? [];
       const retros = retrosRaw ?? [];
 
-      const retroSet = new Set(retros.map(r => r.date));
+      const retroSet = new Set(retros.map((r: any) => r.date));
       const m: Record<string, { rate: number; hasRetro: boolean }> = {};
 
       // 한국 시간 기준으로 날짜별 목표 그룹화
       const goalsByDate: Record<string, Array<{status: string}>> = {};
 
       // 정시 목표 - 한국 시간 기준으로 날짜 변환 (더 정확한 변환)
-      goals.forEach(goal => {
+      goals.forEach((goal: any) => {
         const goalDate = new Date(goal.target_time);
         
         // 한국 시간대로 정확한 변환 (여러 방법 시도)
@@ -139,7 +141,7 @@ export default function HistoryCalendarScreen() {
       });
 
       // 유연한 목표 추가
-      flexibleGoals.forEach(goal => {
+      flexibleGoals.forEach((goal: any) => {
         const dateKey = goal.date; // 이미 YYYY-MM-DD 형식
         
         if (!goalsByDate[dateKey]) goalsByDate[dateKey] = [];
@@ -197,12 +199,10 @@ export default function HistoryCalendarScreen() {
     );
 
   /* ---------- UI ---------- */
-  const insets = useSafeAreaInsets();
-  
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={{ paddingTop: insets.top }} />
+      <View style={{ paddingTop: Math.max(insets.top, 44) }} />
       {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.title}>기록 달력</Text>
@@ -213,7 +213,7 @@ export default function HistoryCalendarScreen() {
       {/* 범례 */}
       <View style={styles.legendRow}>
         {[
-          { txt: 'Bad ≤30%',      color: 'crimson' },
+          { txt: 'Unlucky ≤30%',      color: 'crimson' },
           { txt: 'SoSo 30-69%',   color: '#E67E22' },
           { txt: 'Good 70-99%',   color: 'seagreen' },
           { txt: 'Trans 100%', color: '#1E3A8A' },
