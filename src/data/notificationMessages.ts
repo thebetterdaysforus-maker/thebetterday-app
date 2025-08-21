@@ -211,7 +211,7 @@ export const NOTIFICATION_MESSAGES: NotificationMessage[] = [
   {
     id: 35,
     type: "goal",
-    message: "『{goal}』은 {display_name}님의 선택이에요!.",
+    message: "『{goal}』, 이 선택은 {display_name}님의 길이에요.",
     variables: ["goal", "display_name"],
   },
   {
@@ -223,13 +223,13 @@ export const NOTIFICATION_MESSAGES: NotificationMessage[] = [
   {
     id: 37,
     type: "goal",
-    message: "『{goal}』, 이유를 기억해주세요.",
+    message: "『{goal}』, 마음의 이유를 기억해주세요.",
     variables: ["goal"],
   },
   {
     id: 38,
     type: "goal",
-    message: "『{goal}』, 행동으로 진심을 보여주세요!.",
+    message: "『{goal}』, 행동으로 진심을 보여줘요.",
     variables: ["goal"],
   },
   {
@@ -241,7 +241,7 @@ export const NOTIFICATION_MESSAGES: NotificationMessage[] = [
   {
     id: 40,
     type: "goal",
-    message: "『{goal}』, 오늘의 결정은 훗날 빛날 거예요.",
+    message: "『{goal}』, 오늘의 결정은 빛날 거예요.",
     variables: ["goal"],
   },
   {
@@ -355,9 +355,18 @@ const getUserDisplayName = async (): Promise<string | null> => {
   }
 };
 
-// 개인화된 알림 메시지 생성 함수
-export const getRandomNotificationMessage = async (type: "general" | "goal", goalTitle?: string) => {
-  const filteredMessages = NOTIFICATION_MESSAGES.filter(msg => msg.type === type);
+// 목표 제목 길이 체크 함수 (20자 이하면 GOAL형 사용 가능)
+const canUseGoalNotification = (goalTitle: string): boolean => {
+  return !!(goalTitle && goalTitle.trim().length <= 20);
+};
+
+// 개인화된 알림 메시지 생성 함수 - 자동 타입 선택 및 길이 제한 적용
+export const getRandomNotificationMessage = async (goalTitle?: string) => {
+  // 🎯 목표 제목이 20자 이하면 50% 확률로 GOAL형 사용, 아니면 General형
+  const useGoalType = goalTitle && canUseGoalNotification(goalTitle) && Math.random() < 0.5;
+  const messageType: "general" | "goal" = useGoalType ? "goal" : "general";
+  
+  const filteredMessages = NOTIFICATION_MESSAGES.filter(msg => msg.type === messageType);
   const randomMessage = filteredMessages[Math.floor(Math.random() * filteredMessages.length)];
   
   if (!randomMessage) {
@@ -372,10 +381,13 @@ export const getRandomNotificationMessage = async (type: "general" | "goal", goa
     finalMessage = finalMessage.replace(/\{display_name\}/g, displayName || '사용자');
   }
 
-  // goal 치환 (goal type 메시지용)
-  if (randomMessage.variables?.includes('goal') && goalTitle) {
-    finalMessage = finalMessage.replace(/\{goal\}/g, goalTitle);
+  // goal 치환 (GOAL형 메시지용, 20자 이하 목표에만 적용)
+  if (randomMessage.variables?.includes('goal') && goalTitle && canUseGoalNotification(goalTitle)) {
+    finalMessage = finalMessage.replace(/\{goal\}/g, goalTitle.trim());
+    if (__DEV__) console.log(`🎯 GOAL형 메시지 적용: "${goalTitle}" (${goalTitle.length}자) → "${finalMessage}"`);
   }
+
+  if (__DEV__) console.log(`🔔 선택된 알림 타입: ${messageType}, 최종 메시지: "${finalMessage}"`);
 
   return finalMessage;
 };
