@@ -3,7 +3,7 @@ import React from 'react';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import GuestModeScreen from '../screens/GuestModeScreen';
 import ProfileSetupScreen from '../screens/ProfileSetupScreen';
-import TutorialScreen from '../screens/TutorialScreen';
+
 import useUserStore from '../store/userStore';
 import useProfileStore from '../store/profileStore';
 
@@ -13,15 +13,13 @@ export default function AuthStack() {
   const { session } = useUserStore();
   const { profile } = useProfileStore();
   
-  // 라우팅 결정 로직 - tutorialCompleted 상태 관리는 App.tsx에서만 수행
+  // 라우팅 결정 로직 수정 - Welcome 화면을 우선으로
   let initialRouteName = 'Welcome';
   
+  // 모든 세션에 대해 프로필 존재 여부 확인
   if (session && !profile) {
     // 세션이 있지만 프로필이 없는 경우 - ProfileSetup으로
     initialRouteName = 'ProfileSetup';
-  } else if (session && profile) {
-    // 세션과 프로필이 모두 있는 경우 - Tutorial로 (App.tsx에서 tutorialCompleted 확인)
-    initialRouteName = 'Tutorial';
   }
   
   console.log('🔍 AuthStack 라우팅 결정:', {
@@ -47,11 +45,6 @@ export default function AuthStack() {
         name="ProfileSetup" 
         component={ProfileSetupScreen} 
         options={{ title: '프로필 설정', headerBackVisible: false }} 
-      />
-      <Stack.Screen 
-        name="Tutorial" 
-        component={TutorialScreen} 
-        options={{ headerShown: false }} 
       />
     </Stack.Navigator>
   );
