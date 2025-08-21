@@ -77,7 +77,7 @@ const CommunityScreen = () => {
     ({ item }: { item: DailyResolution }) => (
       <View style={styles.resolutionCard}>
         <View style={styles.resolutionHeader}>
-          <Text style={styles.userName} numberOfLines={1}>
+          <Text style={styles.displayName} numberOfLines={1}>
             {item.display_name}
           </Text>
         </View>
@@ -118,7 +118,7 @@ const CommunityScreen = () => {
   );
 
   const insets = useSafeAreaInsets();
-  
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   myResolutionCard: {
     backgroundColor: "#e8f4ff",
     borderRadius: 12,
-    padding: 16,
+    padding: 15,
     borderWidth: 1,
     borderColor: "#b8daff",
     minHeight: 100,
@@ -442,29 +442,29 @@ const styles = StyleSheet.create({
   resolutionCard: {
     backgroundColor: "#fff",
     marginHorizontal: 20,
-    marginTop: 10,
-    padding: 16,
+    marginTop: 8,
+    paddingRight: 15,
+    paddingLeft: 15,
+    paddingBottom: 10,
     borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
-    minHeight: 120,
+    minHeight: 8,
   },
   resolutionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 5,
   },
-  userName: {
-    fontSize: 12,
-    fontWeight: "500",
+  displayName: {
+    fontSize: 14,
+    fontWeight: "600",
     color: "#333",
-    flex: 0,
-    minWidth: 60,
-    maxWidth: 80,
+    flex: 1,
   },
   date: {
     fontSize: 12,
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 8,
+    paddingTop: 5,
   },
   likeButton: {
     flexDirection: "row",
