@@ -29,6 +29,7 @@ interface TempGoal {
 export default function GoalBatchScreen({ route }: any) {
   // useNavigation hook 사용
   const navigation = useNavigation() as any;
+  const insets = useSafeAreaInsets();
   /* TimeSelect → GoalBatch 첫 진입(선택 직후) */
   const firstTime: string | undefined = route.params?.prefilledTime;
   // 🔥 "내일 우선" 로직: 기본값을 "tomorrow"로 설정
@@ -78,10 +79,10 @@ export default function GoalBatchScreen({ route }: any) {
           return tomorrow;
         })()
       : (() => {
-          // 🔥 한국 시간 기준으로 3시간 후 계산
-          const koreaTime = new Date(
-            new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
-          );
+          // UTC 오프셋 방식으로 안정적인 한국 시간 계산
+          const now = new Date();
+          const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+          const koreaTime = new Date(utcTime + (9 * 60 * 60 * 1000));
           const futureTime = new Date(koreaTime.getTime() + 3 * 60 * 60 * 1000); // 3시간 후
           const roundedMinutes = Math.ceil(futureTime.getMinutes() / 30) * 30;
           if (roundedMinutes >= 60) {
@@ -378,12 +379,10 @@ export default function GoalBatchScreen({ route }: any) {
   };
 
   /* ──────────────── UI ──────────────── */
-  const insets = useSafeAreaInsets();
-  
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F0F0F0" />
-      <View style={{ paddingTop: insets.top }} />
+      <View style={{ paddingTop: Math.max(insets.top, 44) }} />
       <FlatList
         ref={scrollViewRef}
         data={tempGoals}
