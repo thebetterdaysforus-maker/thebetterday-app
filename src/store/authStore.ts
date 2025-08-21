@@ -383,7 +383,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await AsyncStorage.setItem('guest_session', JSON.stringify(data.session));
         console.log('💾 게스트 세션 저장 완료');
         
-        // 게스트도 프로필 설정 화면을 거치도록 자동 생성하지 않음
+        // 게스트 프로필은 ProfileSetup 화면에서 생성하도록 변경
         console.log('🎭 게스트 모드: ProfileSetup으로 이동 예정');
         
         // 게스트도 자동 로그인 활성화
