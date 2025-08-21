@@ -178,9 +178,10 @@ export default function GoalDetailScreen({ route, navigation }: any) {
         console.log("✅ 목표 추가 완료 - 홈 화면으로 이동");
       }
 
-      // 강제 화면 이동 보장
+      // 모든 경우에 HOME 화면으로 이동 보장
       setTimeout(() => {
-        backToList();
+        console.log("🏠 목표 저장 완료 - HOME 화면으로 직접 이동");
+        navigation.navigate("GoalList");
       }, 100);
     } catch (e: any) {
       Alert.alert(
@@ -217,7 +218,7 @@ export default function GoalDetailScreen({ route, navigation }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={{ paddingTop: insets.top }} />
+      <View style={{ paddingTop: Math.max(insets.top, 44) }} />
       <View style={styles.container}>
         <Text style={styles.headerText}>
           {existing
