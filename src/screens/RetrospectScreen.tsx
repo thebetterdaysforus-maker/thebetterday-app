@@ -46,7 +46,7 @@ export default function RetrospectScreen({ navigation }: any) {
 
   // 완전승리 시에는 동기부여 메시지 생략, 실패 시에만 격려 메시지 표시
   const motivationalMessage = hasFailure
-    ? "실패는 성공의 어머니입니다. 내일은 더 나은 하루를 만들어보세요! 💪"
+    ? "실패는 성공의 어머니입니다. \n 내일은 더 나은 하루를 만들어보세요! 💪"
     : null;
 
   /* 저장 */
@@ -108,9 +108,6 @@ export default function RetrospectScreen({ navigation }: any) {
                 <Text style={styles.failedGoalTitle}>{goal.title}</Text>
               </View>
             ))}
-            <Text style={styles.failedGoalsNote}>
-              패배는 그저 승리의 발판입니다!
-            </Text>
           </View>
         )}
 
@@ -172,9 +169,9 @@ const styles = StyleSheet.create({
   // 패배한 목표 스타일
   failedGoalsBox: {
     backgroundColor: "#fff5f5",
-    padding: 16,
+    padding: 15,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 15,
     borderLeftWidth: 4,
     borderLeftColor: "#e74c3c",
   },
@@ -182,7 +179,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#c0392b",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   failedGoalItem: {
     flexDirection: "row",
@@ -203,13 +200,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: "#2c3e50",
-  },
-  failedGoalsNote: {
-    fontSize: 12,
-    color: "#7f8c8d",
-    fontStyle: "italic",
-    marginTop: 8,
-    textAlign: "center",
   },
 
   motivationBox: {

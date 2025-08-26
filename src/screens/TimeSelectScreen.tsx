@@ -10,26 +10,38 @@ import CustomTimePicker from "../components/CustomTimePicker";
 
 /* ────── 날짜 헬퍼 ────── */
 const nearestFutureHalfHour = (): Date => {
-  // 🔥 한국 시간 기준으로 3시간 후 계산
-  const koreaTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
-  koreaTime.setHours(koreaTime.getHours() + 3);
+  // 🔥 한국 시간 기준으로 3시간 후 계산 (안정적인 방식 사용)
+  const now = new Date();
+  const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000); // UTC + 9시간
+  koreaTime.setHours(koreaTime.getHours() + 3); // 3시간 후
   const m = koreaTime.getMinutes();
   const rounded = m < 30 ? 30 : 60;
   if (rounded === 60) koreaTime.setHours(koreaTime.getHours() + 1);
   koreaTime.setMinutes(rounded % 60, 0, 0);
   
   console.log("📅 nearestFutureHalfHour 계산:", {
-    현재한국시간: new Date().toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}),
+    현재한국시간: now.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'}),
     계산결과: koreaTime.toLocaleString('ko-KR')
   });
   
   return koreaTime;
 };
 const tomorrowStart = (): Date => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(0, 30, 0, 0); // 오전 12:30부터 시작 (12:00 방지)
-  return d;
+  // 🔥 APK 정확한 D+1 로직 
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const koreaTime = new Date(utc + (9 * 60 * 60 * 1000));
+  
+  const tomorrow = new Date(koreaTime);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0); // 오전 9시 시작
+  
+  console.log('🇰🇷 D+1 내일 시작:', {
+    현재한국: koreaTime.toLocaleString('ko-KR'),
+    내일시작: tomorrow.toLocaleString('ko-KR')
+  });
+  
+  return tomorrow;
 };
 const tomorrowEnd = (): Date => {
   const d = tomorrowStart();
@@ -97,7 +109,11 @@ export default function TimeSelectScreen({ navigation, route }: any) {
       return; // 저장 시도 자체를 차단
     }
     const selectedTimeISO = targetTime.toISOString();
+    // APK 환경에서 한국 시간 강제 적용
     const now = new Date();
+    const koreaOffset = 9 * 60; // UTC+9
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const koreaTime = new Date(utc + (koreaOffset * 60000));
 
     // 00:00:00 시간 자동 수정 (Date value out of bounds 방지)
     if (targetTime.getHours() === 0 && targetTime.getMinutes() === 0) {
@@ -114,14 +130,15 @@ export default function TimeSelectScreen({ navigation, route }: any) {
       isTomorrow,
       isTimeReset,
       현재시간: now.toLocaleString('ko-KR'),
+      한국시간: koreaTime.toLocaleString('ko-KR'),
       수행시간: targetTime.toLocaleString('ko-KR'),
       제약건너뜀: isTomorrow || isTimeReset
     });
     
     if (!isTomorrow && !isTimeReset) {
-      // 🌙 23:30 이후 당일 목표 설정 제한 체크 (3시간 제한보다 우선)
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
+      // 🌙 23:30 이후 당일 목표 설정 제한 체크 (3시간 제한보다 우선) - 한국시간 기준
+      const currentHour = koreaTime.getHours();
+      const currentMinute = koreaTime.getMinutes();
       
       if (currentHour === 23 && currentMinute >= 30) {
         console.log("❌ 23:30 이후 당일 목표 설정 제한 위반");
@@ -132,14 +149,14 @@ export default function TimeSelectScreen({ navigation, route }: any) {
         return;
       }
       
-      // 🔥 새 목표 모드 3시간 제한 활성화 (당일만)
-      const minAllowedTime = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+      // 🔥 새 목표 모드 3시간 제한 활성화 (당일만) - 한국시간 기준
+      const minAllowedTime = new Date(koreaTime.getTime() + 3 * 60 * 60 * 1000);
       if (targetTime <= minAllowedTime) {
         console.log("❌ 당일 수행 목록 작성 3시간 제한 위반 - 알림 표시");
         Alert.alert(
           '수행 목록 설정 시간 제한', 
           '새 수행 목록은 현재 시간으로부터 최소 3시간 이후에 설정할 수 있습니다.\n\n' +
-          `현재 시간: ${now.toLocaleTimeString('ko-KR', { hour12: true, hour: '2-digit', minute: '2-digit' }).replace('AM', '오전').replace('PM', '오후')}\n` +
+          `현재 시간: ${koreaTime.toLocaleTimeString('ko-KR', { hour12: true, hour: '2-digit', minute: '2-digit' }).replace('AM', '오전').replace('PM', '오후')}\n` +
           `설정 가능한 시간: ${minAllowedTime.toLocaleTimeString('ko-KR', { hour12: true, hour: '2-digit', minute: '2-digit' }).replace('AM', '오전').replace('PM', '오후')} 이후`
         );
         return;
@@ -193,22 +210,24 @@ export default function TimeSelectScreen({ navigation, route }: any) {
       }))
     });
 
-    // 🔥 정확한 30분 충돌 체크 - 실제 충돌만 감지
+    // 🔥 APK 정확한 30분 충돌 방지 시스템
     const conflictingGoals = sameDayGoals.filter((g) => {
-      // 편집 모드에서는 현재 편집 중인 목표 제외
+      // 편집 모드에서는 자기 자신 제외
       if (isTimeReset && g.id === goalId) return false;
 
-      const goalTime = new Date(g.target_time).getTime();
-      const timeDiff = Math.abs(targetTime.getTime() - goalTime);
-      const thirtyMinutes = 30 * 60 * 1000; // 30분을 밀리초로 변환
-      const isConflict = timeDiff < thirtyMinutes;
+      const goalMs = new Date(g.target_time).getTime();
+      const targetMs = targetTime.getTime();
+      const diffMs = Math.abs(targetMs - goalMs);
+      const THIRTY_MIN = 30 * 60 * 1000;
 
-      console.log("⏰ 정확한 충돌 체크:", {
-        기존목록: g.title,
+      const isConflict = diffMs < THIRTY_MIN;
+
+      console.log("⏰ 30분 충돌 검사:", {
+        기존: g.title,
         기존시간: new Date(g.target_time).toLocaleTimeString('ko-KR'),
-        선택시간: targetTime.toLocaleTimeString('ko-KR'),
-        시간차분: Math.round(timeDiff / (60 * 1000)) + "분",
-        충돌여부: isConflict
+        새시간: targetTime.toLocaleTimeString('ko-KR'),
+        차이분: Math.round(diffMs / 60000),
+        충돌: isConflict
       });
 
       return isConflict;

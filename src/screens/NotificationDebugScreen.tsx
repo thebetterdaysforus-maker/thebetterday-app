@@ -91,7 +91,7 @@ export default function NotificationDebugScreen({ navigation }: NotificationDebu
         </TouchableOpacity>
         <Text style={styles.headerTitle}>알림 디버깅</Text>
         <TouchableOpacity onPress={loadNotifications}>
-          <Ionicons name="refresh" size={24} color="#7B68EE" />
+          <Ionicons name="refresh" size={24} color="#556B2F" />
         </TouchableOpacity>
       </View>
 
@@ -115,7 +115,7 @@ export default function NotificationDebugScreen({ navigation }: NotificationDebu
             style={styles.testButton} 
             onPress={handleTestEnhancedNotification}
           >
-            <Ionicons name="notifications" size={20} color="#7B68EE" />
+            <Ionicons name="notifications" size={20} color="#556B2F" />
             <Text style={styles.testButtonText}>강화된 알림 테스트 (10초 후)</Text>
           </TouchableOpacity>
 

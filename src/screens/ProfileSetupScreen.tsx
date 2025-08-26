@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Alert,
   Button,
@@ -79,6 +79,8 @@ export default function ProfileSetupScreen({ route }: any) {
     >,
   );
   const [allAgree, setAllAgree] = useState(false);
+
+
 
   /* 원클릭 전체 동의 */
   const handleOneClickAgree = () => {
@@ -224,9 +226,19 @@ export default function ProfileSetupScreen({ route }: any) {
 
       console.log("🔘 프로필 저장 완료 - 메인 화면으로 이동");
 
+      // 첫 실행 플래그 명시적으로 해제 (프로필 설정 완료)
+      try {
+        await AsyncStorage.setItem('hasLaunchedBefore', 'true');
+        console.log("✅ 첫 실행 플래그 해제 완료");
+      } catch (error) {
+        console.log("⚠️ 첫 실행 플래그 해제 실패:", error);
+      }
+
       // 🔥 "내일 우선" 로직: 신규 사용자는 첫 목표를 내일 목표로 작성
       // 프로필 설정 완료 후 자동으로 MainTab으로 이동됨 (App.tsx에서 처리)
-      console.log("✅ 신규 사용자 프로필 설정 완료 - 자동으로 메인 화면 이동");
+      console.log("✅ 신규 사용자 프로필 설정 완료 - App.tsx에서 자동 화면 전환 대기");
+      
+      // App.tsx의 profile 상태 변화 감지에 의존하여 자동 화면 전환
     } catch (e: any) {
       console.error("프로필 저장 실패:", e);
       Alert.alert(
@@ -611,22 +623,5 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     textAlign: "center",
-  },
-
-  tutorialButton: {
-    backgroundColor: "#f0f9ff",
-    borderWidth: 1,
-    borderColor: "#8B5CF6",
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    marginBottom: 2,
-  },
-
-  tutorialButtonText: {
-    color: "#8B5CF6",
-    fontSize: 16,
-    fontWeight: "500",
   },
 });

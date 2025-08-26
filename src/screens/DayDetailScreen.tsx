@@ -237,7 +237,7 @@ export default function DayDetailScreen({ route }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
-      <View style={{ paddingTop: insets.top }} />
+      <View style={{ paddingTop: Math.max(insets.top, 44) }} />
       <ScrollView contentContainerStyle={s.wrap}>
       {/* 날짜 헤드라인 */}
       <Text style={s.headDate}>{date}</Text>

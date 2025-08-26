@@ -55,14 +55,14 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
 
     const targetDateString = getTargetDateString();
 
-    console.log("🔍 필수 목표 중복 검사:", {
+    console.log("🔍 자유 목표 중복 검사:", {
       targetDate: targetDateString,
       hasGoal: hasTodayGoal(targetDateString),
       현재필수목표들: getGoalsByDate(targetDateString),
     });
 
     if (hasTodayGoal(targetDateString)) {
-      Alert.alert("알림", "이미 해당 날짜의 필수 목표를 작성했습니다.");
+      Alert.alert("알림", "이미 해당 날짜의 자유 목표를 작성했습니다.");
       return;
     }
 
@@ -194,9 +194,7 @@ const FlexibleGoalScreen: React.FC<FlexibleGoalScreenProps> = ({
         <Text style={styles.headerSubtitle}>
           시간에 얽매이지 않고 오늘 달성하고 싶은 목표를 적어주세요!
         </Text>
-        <Text style={styles.noticeText}>
-          📌 자유 목표는 당일 기준으로만 적용됩니다!
-        </Text>
+
       </View>
 
       {/* 목표 섹션 */}

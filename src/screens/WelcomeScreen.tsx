@@ -18,11 +18,14 @@ interface WelcomeScreenProps {
 
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { signInWithGoogle } = useAuthStore();
+  const { signInWithGoogle, backupGuestSession, restoreGuestSession } = useAuthStore();
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
+      // 기존 게스트 세션이 있다면 백업
+      await backupGuestSession();
+      
       const result = await signInWithGoogle();
 
       if (result.success) {
@@ -32,6 +35,10 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
           navigation.navigate("Main");
         }
       } else {
+        // Google 로그인 실패 시 게스트 세션 복원
+        console.log('❌ Google 로그인 실패 - 게스트 세션 복원 시도');
+        await restoreGuestSession();
+        
         Alert.alert(
           "Google 로그인 실패",
           result.error || "로그인 중 오류가 발생했습니다.",
@@ -39,6 +46,9 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
         );
       }
     } catch (error) {
+      console.log('❌ Google 로그인 오류 - 게스트 세션 복원 시도');
+      await restoreGuestSession();
+      
       Alert.alert("Google 로그인 오류", "예상치 못한 오류가 발생했습니다.", [
         { text: "확인" },
       ]);

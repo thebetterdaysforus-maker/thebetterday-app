@@ -388,6 +388,12 @@ export default function GoalBatchScreen({ route }: any) {
         data={tempGoals}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
+        removeClippedSubviews={false}
+        getItemLayout={(data, index) => ({
+          length: 72, // 행 높이 (margin 포함)
+          offset: 72 * index,
+          index,
+        })}
         renderItem={({ item }) => (
           <View style={styles.row}>
             <TouchableOpacity
@@ -614,7 +620,7 @@ const styles = StyleSheet.create({
   addGoalButton: {
     backgroundColor: "#F8F9FA",
     borderWidth: 2,
-    borderColor: "#7B68EE",
+    borderColor: "#556B2F",
     borderStyle: "dashed",
     borderRadius: 16,
     paddingVertical: 16,
@@ -626,17 +632,17 @@ const styles = StyleSheet.create({
   addGoalButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#7B68EE",
+    color: "#556B2F",
     letterSpacing: 0.3,
   },
   completeButton: {
-    backgroundColor: "#7B68EE",
+    backgroundColor: "#556B2F",
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 32,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#7B68EE",
+    shadowColor: "#556B2F",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

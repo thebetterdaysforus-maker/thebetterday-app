@@ -27,8 +27,8 @@ const CommunityScreen = () => {
     currentFilter,
     fetchMyResolution,
     saveMyResolution,
-    updateMyResolution,
     deleteMyResolution,
+    toggleMyResolutionPublic,
     fetchResolutions,
     toggleLike,
     setFilter,
@@ -71,6 +71,17 @@ const CommunityScreen = () => {
     setRefreshing(true);
     await Promise.all([fetchMyResolution(), refreshResolutions()]);
     setRefreshing(false);
+  };
+
+  const handleTogglePublic = async () => {
+    try {
+      await toggleMyResolutionPublic();
+    } catch (error: any) {
+      Alert.alert(
+        "공개 설정 변경 실패",
+        error.message || "공개 설정 변경에 실패했습니다.",
+      );
+    }
   };
 
   const renderResolutionItem = React.useCallback(
@@ -144,10 +155,10 @@ const CommunityScreen = () => {
           <View style={styles.noResolutionCard}>
             <Ionicons name="chatbubble-outline" size={24} color="#999" />
             <Text style={styles.noResolutionText}>
-              아직 어제의 각오가 없어요
+              등록 각오/다짐 문이 없어 네트워킹에 공유되지 않았습니다.
             </Text>
             <Text style={styles.noResolutionSubText}>
-              Home 화면에서 내일의 각오를 작성해보세요!
+              네트워킹에는 전날 각오/다짐만 표시됩니다!
             </Text>
           </View>
         ) : (
@@ -160,6 +171,16 @@ const CommunityScreen = () => {
               </Text>
             </View>
             <View style={styles.compactStats}>
+              <TouchableOpacity
+                style={styles.publicToggleButton}
+                onPress={handleTogglePublic}
+              >
+                <Ionicons
+                  name={myResolution.is_public ? "eye" : "eye-off"}
+                  size={14}
+                  color={myResolution.is_public ? "#007AFF" : "#999"}
+                />
+              </TouchableOpacity>
               <Ionicons name="heart" size={14} color="#ff6b6b" />
               <Text style={styles.compactLikeCount}>
                 {myResolution.like_count || 0}
@@ -343,6 +364,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
   },
+  publicToggleButton: {
+    padding: 4,
+    marginRight: 8,
+  },
   myResolutionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -510,20 +535,20 @@ const styles = StyleSheet.create({
   // 새로운 읽기 전용 스타일
   noResolutionCard: {
     alignItems: "center",
-    padding: 24,
+    padding: 20,
     backgroundColor: "#f8f9fa",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e9ecef",
   },
   noResolutionText: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#666",
     marginTop: 8,
     fontWeight: "500",
   },
   noResolutionSubText: {
-    fontSize: 12,
+    fontSize: 10,
     color: "#999",
     marginTop: 4,
   },

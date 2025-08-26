@@ -163,7 +163,7 @@ export default function ProfileEditScreen({ navigation }: ProfileEditScreenProps
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-      <View style={{ paddingTop: insets.top }} />
+      <View style={{ paddingTop: Math.max(insets.top, 44) }} />
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

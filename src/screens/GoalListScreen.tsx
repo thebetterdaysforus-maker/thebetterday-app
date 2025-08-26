@@ -37,6 +37,7 @@ import { FLATLIST_OPTIMIZATION_PROPS } from "../utils/performanceOptimizer";
 import { useOptimizedGoals } from "../hooks/useOptimizedGoals";
 
 import { getTodayKorea, getTomorrowKorea, getKoreaTime } from "../utils/timeUtils";
+import { supabase } from "../supabaseClient";
 import { getBadgeImage } from "../utils/badgeImageMap";
 import { DailyStreakManager } from "../utils/streakBadgeSystem";
 // 스타일 상수 제거
@@ -132,13 +133,13 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
     }
   };
   const { profile, updateDream, fetchProfile } = useProfileStore();
-  const { todayRetrospectExists, fetchToday } = useRetrospectStore();
+  const { todayRetrospectExists, fetchToday, saveRetrospect } = useRetrospectStore();
   const {
     myResolution,
     fetchMyResolution,
     saveMyResolution: saveResolution,
-    updateMyResolution,
     deleteMyResolution,
+    toggleMyResolutionPublic,
   } = useCommunityStore();
   const {
     goals: flexibleGoals,
@@ -161,11 +162,45 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
   const [isWritingResolution, setIsWritingResolution] = useState(false);
   const [resolutionText, setResolutionText] = useState("");
   const [isResolutionExpanded, setIsResolutionExpanded] = useState(false);
+  const [todayResolution, setTodayResolution] = useState<string | null>(null);
+  const [currentDisplayDate, setCurrentDisplayDate] = useState("");
+  const [currentFlexibleGoals, setCurrentFlexibleGoals] = useState<any[]>([]);
+
+  /* ---------- 동적 각오 조회 함수 ---------- */
+  const fetchResolutionForDate = async (date: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        const { data, error } = await supabase
+          .from('daily_resolutions')
+          .select('content')
+          .eq('user_id', session.user.id)
+          .eq('date', date)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error(`${date} 각오 조회 오류:`, error);
+          return null;
+        }
+
+        return data?.content || null;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error(`${date} 각오 조회 실패:`, error);
+      return null;
+    }
+  };
 
   /* 메모 관련 상태 */
   const [memoModalVisible, setMemoModalVisible] = useState(false);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [memoText, setMemoText] = useState("");
+
+  /* 회고 관련 상태 */
+  const [retrospectText, setRetrospectText] = useState("");
 
   /* 당겨서 새로고침 상태 */
   const [refreshing, setRefreshing] = useState(false);
@@ -186,49 +221,55 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
     }
   }, [route?.params, navigation]);
 
-  /* ───── 초기화 ───── */
+  /* ───── 통합 동기화 시스템 적용 ───── */
   useEffect(() => {
-    const handleAppActive = (state: string) => {
+    const handleAppActive = async (state: string) => {
       if (state === "active") {
-        fetchGoals();
-        // cleanupOldGoals(); // 2년 보관 정책으로 인해 비활성화
-        expireOverdueGoals();
-        fetchMyResolution();
-        fetchToday();
-        fetchProfile();
+        console.log('📱 앱 활성화 - 통합 동기화 시작');
+        // 마스터 데이터 관리자로 모든 동기화 처리
+        const { masterDataManager } = await import('../store/masterDataManager');
+        const success = await masterDataManager.syncOnAppResume();
+        
+        if (success) {
+          console.log('✅ 앱 복귀 동기화 완료');
+          // 만료 처리만 별도 실행
+          expireOverdueGoals();
+        } else {
+          console.log('⚠️ 앱 복귀 동기화 일부 실패');
+        }
       }
     };
     const subscription = AppState.addEventListener("change", handleAppActive);
 
-    // 초기 실행
-    console.log("🚀 GoalListScreen에서 fetchGoals 호출 시작");
-    fetchGoals().catch((err) => console.error("❌ fetchGoals 오류:", err));
-    // cleanupOldGoals(); // 2년 보관 정책으로 인해 비활성화
-    expireOverdueGoals();
-    // 회고 알림 시스템이 goalStore에서 자동 처리됨
-    fetchMyResolution();
-    fetchFlexibleGoals();
-    fetchToday();
-    fetchProfile();
+    // 초기 실행은 App.tsx의 masterDataManager에서 처리됨
+    console.log("🚀 GoalListScreen 초기화 - 마스터 동기화 의존");
 
     return () => subscription?.remove();
-  }, [expireOverdueGoals, cleanupOldGoals, fetchMyResolution, fetchToday]);
+  }, [expireOverdueGoals]);
 
-  /* 당겨서 새로고침 함수 */
+  /* 통합 당겨서 새로고침 */
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      console.log("🔄 당겨서 새로고침 시작");
+      console.log("🔄 당겨서 새로고침 - 통합 동기화");
 
-      // 모든 데이터 동시 새로고침
-      await Promise.all([
-        fetchGoals(),
-        fetchProfile(),
-        fetchToday(),
-        fetchMyResolution(),
-        fetchFlexibleGoals(),
-        expireOverdueGoals(),
-      ]);
+      // 마스터 데이터 관리자로 모든 동기화 처리
+      const { masterDataManager } = await import('../store/masterDataManager');
+      const success = await masterDataManager.syncOfflineData();
+      
+      if (success) {
+        console.log("✅ 당겨서 새로고침 완료");
+      } else {
+        // 실패 시 개별 동기화 시도
+        await Promise.all([
+          fetchGoals(),
+          fetchProfile(),
+          fetchToday(),
+          fetchMyResolution(),
+          fetchFlexibleGoals(),
+          expireOverdueGoals(),
+        ]);
+      }
 
       console.log("✅ 당겨서 새로고침 완료");
 
@@ -236,7 +277,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       // Alert.alert("새로고침 완료", "최신 데이터로 업데이트되었습니다");
     } catch (error) {
       console.error("❌ 새로고침 오류:", error);
-      Alert.alert("새로고침 실패", "데이터를 불러오는 중 오류t�� 발생했습니다");
+      Alert.alert("새로고침 실패", "데이터를 불러오는 중 오류가 발생했습니다");
     } finally {
       setRefreshing(false);
     }
@@ -277,16 +318,58 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
         clearInterval(intervalRef.current);
       }
 
-      // 앱 활성 상태에 따른 간격 설정
-      const intervalTime = appState === "active" ? 30000 : 300000; // 30초 vs 5분
+      // 스마트 적응형 간격 시스템
+      const calculateSmartInterval = () => {
+        if (appState !== "active") return 300000; // 5분 (비활성)
+        
+        // 목표 시간과의 거리에 따라 간격 조정
+        const now = new Date();
+        const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+        
+        const nearestGoalTime = allGoalsWithCheck
+          .filter(item => item.goal.status === "pending")
+          .map(item => {
+            const goalTime = new Date(item.goal.target_time);
+            return goalTime.getTime() - koreaTime.getTime();
+          })
+          .filter(timeDiff => timeDiff > 0)
+          .sort((a, b) => a - b)[0];
+        
+        if (!nearestGoalTime) return 60000; // 1분 (목표 없음)
+        if (nearestGoalTime <= 120000) return 10000; // 10초 (2분 이내)
+        if (nearestGoalTime <= 300000) return 30000; // 30초 (5분 이내)
+        return 60000; // 1분 (일반)
+      };
 
-      console.log(
-        `🔄 간격 설정: ${appState === "active" ? "30초 (활성)" : "5분 (비활성)"}`,
-      );
+      const intervalTime = calculateSmartInterval();
+      const intervalLabel = {
+        10000: "10초 (목표 임박)",
+        30000: "30초 (목표 근접)",
+        60000: "1분 (일반)",
+        300000: "5분 (비활성)"
+      }[intervalTime] || `${intervalTime/1000}초`;
+
+      console.log(`🔄 스마트 간격 설정: ${intervalLabel}`);
 
       intervalRef.current = setInterval(async () => {
+        const now = new Date();
+        const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+        const hasNearbyGoal = allGoalsWithCheck.some(item => {
+          const goalTime = new Date(item.goal.target_time);
+          const timeDiff = goalTime.getTime() - koreaTime.getTime();
+          return timeDiff > 0 && timeDiff <= 120000; // 2분 이내
+        });
+        
+        if (hasNearbyGoal) {
+          console.log("🔥 목표 시간 2분 이내 - 집중 모니터링");
+        }
+        
         await expireOverdueGoals();
         forceUpdate(); // UI 강제 리렌더링
+        
+        // 간격 재계산을 위해 타이머 재설정
+        clearInterval(intervalRef.current!);
+        setTimeout(setupInterval, 100); // 0.1초 후 재설정
       }, intervalTime);
     };
 
@@ -298,6 +381,48 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       }
     };
   }, [appState, expireOverdueGoals]);
+
+  /* 자유 목표 & 각오: sections 연동 업데이트 */
+  useEffect(() => {
+    // sections 계산 후 자유 목표 데이터 업데이트
+    if (sections.length > 0) {
+      const firstGoal = sections[0].data[0]?.goal;
+      if (firstGoal) {
+        const goalDate = new Date(firstGoal.target_time);
+        const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+        const detectedDisplayDate = koreanDate.toISOString().slice(0, 10);
+        
+        // 자유 목표 조회 및 업데이트
+        const { getGoalsByDate } = useFlexibleGoalStore.getState();
+        const flexibleGoals = getGoalsByDate(detectedDisplayDate);
+        setCurrentFlexibleGoals(flexibleGoals);
+        
+        // 날짜 업데이트
+        if (detectedDisplayDate !== currentDisplayDate) {
+          setCurrentDisplayDate(detectedDisplayDate);
+        }
+        
+        console.log("🔍 자유 목표 업데이트:", {
+          날짜: detectedDisplayDate,
+          개수: flexibleGoals.length,
+          목록: flexibleGoals.map((g) => g.title),
+        });
+      }
+    }
+  }, [goals, todayRetrospectExists, currentDisplayDate]);
+
+  /* 각오: currentDisplayDate 변경 시 동적 조회 */
+  useEffect(() => {
+    const fetchCurrentResolution = async () => {
+      if (currentDisplayDate) {
+        const resolution = await fetchResolutionForDate(currentDisplayDate);
+        setTodayResolution(resolution);
+        console.log(`🔍 각오 동적 조회 (${currentDisplayDate}):`, resolution);
+      }
+    };
+    
+    fetchCurrentResolution();
+  }, [currentDisplayDate]);
 
   // 앱이 활성화될 때 즉시 업데이트
   useEffect(() => {
@@ -428,12 +553,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       }
     }
 
-    // 필수 목표는 홈 화면에 표시하지 않음 (오른쪽 상단 버튼에만 표시)
-    const tomorrowFlexible = getTomorrowFlexibleGoals();
-    console.log("🔍 필수 목표 (오른쪽 상단 전용):", {
-      개수: tomorrowFlexible.length,
-      목록: tomorrowFlexible.map((g) => g.title),
-    });
+    console.log("🔍 자유 목표 데이터 준비 완료");
 
     console.log(
       "🔥 sections 최종 결과:",
@@ -482,6 +602,17 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
   const canWriteToday = !todayRetrospectExists;
   const canWriteTomorrow = todayRetrospectExists;
 
+  // 내일 목표 존재 여부 확인
+  const tomorrowGoalsExist = useMemo(() => {
+    const { tomorrowKey } = getCurrentDateKeys();
+    const tomorrowGoals = allGoalsWithCheck.filter((x) => {
+      const goalDate = new Date(x.goal.target_time);
+      const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+      return koreanDate.toISOString().slice(0, 10) === tomorrowKey;
+    });
+    return tomorrowGoals.length > 0;
+  }, [allGoalsWithCheck]);
+
   /* 꿈 편집 핸들러 (최적화) */
   const handleStartEditDream = useCallback(() => {
     const currentDream = profile?.dream || "";
@@ -520,6 +651,12 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
 
   /* 각오 편집 핸들러 */
   const handleWriteResolution = () => {
+    // 수행 목록이 없으면 알림창 표시
+    if (allGoalsWithCheck.length === 0) {
+      Alert.alert("알림", "수행 목록을 먼저 작성해주세요. 목표가 있어야 각오/다짐을 작성할 수 있습니다.");
+      return;
+    }
+    
     setResolutionText(myResolution?.content || "");
     setIsWritingResolution(true);
   };
@@ -537,11 +674,16 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
 
     try {
       Keyboard.dismiss();
+      
+      // 기존 각오가 있으면 경고 메시지 표시
       if (myResolution) {
-        await updateMyResolution(resolutionText.trim());
-      } else {
-        await saveResolution(resolutionText.trim());
+        Alert.alert("알림", "이미 오늘의 각오가 작성되어 있습니다. 하루에 하나의 각오만 작성할 수 있습니다.");
+        setIsWritingResolution(false);
+        setResolutionText("");
+        return;
       }
+      
+      await saveResolution(resolutionText.trim());
       setIsWritingResolution(false);
       setResolutionText("");
       Alert.alert("성공", "각오/다짐이 저장되었습니다! 💪");
@@ -579,12 +721,24 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
 
   /* 메모 관련 핸들러 (최적화) */
   const handleAddMemo = useCallback((goalId: string) => {
+    console.log("🔘 기록 버튼 클릭됨 - handleAddMemo 호출", goalId);
     const goal = goals.find((g) => g.id === goalId);
-    if (!goal) return;
+    if (!goal) {
+      console.log("❌ 목표를 찾을 수 없음:", goalId);
+      return;
+    }
+
+    console.log("✅ 메모 모달 표시 중...", {
+      goalId,
+      goalTitle: goal.title,
+      existingMemo: goal.achievement_memo,
+    });
 
     setSelectedGoalId(goalId);
     setMemoText(goal.achievement_memo || "");
     setMemoModalVisible(true);
+    
+    console.log("✅ 메모 모달 상태 업데이트 완료");
   }, [goals]);
 
   const handleSaveMemo = async () => {
@@ -643,21 +797,19 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
           {/* 오른쪽: 유연한 목표 */}
           <View style={styles.rightHeaderSection}>
             {(() => {
-              const tomorrowFlexibleGoals = getTomorrowFlexibleGoals();
-
-              return tomorrowFlexibleGoals.length > 0 ? (
+              return currentFlexibleGoals.length > 0 ? (
                 <TouchableOpacity
                   style={styles.flexibleGoalWidget}
                   onPress={() => {
                     if (navigation) {
                       navigation.navigate("FlexibleGoal", {
-                        targetDate: "tomorrow",
+                        targetDate: currentDisplayDate === getTodayKorea() ? "today" : "tomorrow",
                       });
                     }
                   }}
                 >
                   <Text style={styles.flexibleGoalPreview}>
-                    {tomorrowFlexibleGoals[0]?.title || ""}
+                    {currentFlexibleGoals[0]?.title || ""}
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -666,7 +818,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                   onPress={() => {
                     if (navigation) {
                       navigation.navigate("FlexibleGoal", {
-                        targetDate: "tomorrow",
+                        targetDate: currentDisplayDate === getTodayKorea() ? "today" : "tomorrow",
                       });
                     }
                   }}
@@ -723,11 +875,34 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
         </View>
       </View>
 
-      {/* 각오 섹션 - 항상 표시 */}
+      {/* 각오 섹션 - 조건부 표시 */}
       <View style={styles.resolutionAlwaysSection}>
         <View style={styles.resolutionSectionContainer}>
-          {/* 각오 작성하기 버튼 */}
-          {!myResolution && (
+          {/* 오늘 실행할 각오가 있을 때 */}
+          {todayResolution && (
+            <View style={styles.resolutionContainer}>
+              <View style={[styles.myResolutionCard, { backgroundColor: "#2C2C2E" }]}>
+                <Text style={styles.myResolutionContent}>
+                  {todayResolution}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* 오늘 실행할 각오가 없을 때 - 안내 문구 */}
+          {!todayResolution && (
+            <View style={styles.resolutionGuideContainer}>
+              <Text style={styles.resolutionGuideText}>
+                마음의 준비는 어제부터 시작됩니다
+              </Text>
+              <Text style={styles.resolutionGuideSubText}>
+                내일을 위한 다짐을 미리 준비해보세요
+              </Text>
+            </View>
+          )}
+
+          {/* 내일을 위한 각오 작성 (조건: 현재 각오 없음 + 내일 목표 존재) */}
+          {!myResolution && !todayResolution && tomorrowGoalsExist && (
             <View style={styles.resolutionContainer}>
               {!isWritingResolution && (
                 <TouchableOpacity
@@ -735,7 +910,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                   onPress={handleWriteResolution}
                 >
                   <Text style={styles.resolutionWriteButtonText}>
-                    나의 각오/다짐 작성하기
+                    내일을 위한 각오/다짐 작성하기
                   </Text>
                 </TouchableOpacity>
               )}
@@ -744,7 +919,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                 <View style={styles.resolutionWriteSection}>
                   <TextInput
                     style={styles.resolutionTextInput}
-                    placeholder="각오/다짐을 입력해주세요 (최대 100자)"
+                    placeholder="내일을 위한 각오/다짐을 입력해주세요 (최대 100자)"
                     value={resolutionText}
                     onChangeText={setResolutionText}
                     multiline
@@ -775,8 +950,8 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
             </View>
           )}
 
-          {/* 저장된 각오 표시 (수정/삭제 가능) */}
-          {myResolution && (
+          {/* 내일을 위한 각오 표시 (조건: 현재 각오 없음 + 내일 목표 존재) */}
+          {myResolution && !todayResolution && tomorrowGoalsExist && (
             <View style={styles.resolutionContainer}>
               <TouchableOpacity
                 style={[
@@ -829,16 +1004,6 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                   <View style={styles.myResolutionActions}>
                     <TouchableOpacity
                       style={styles.resolutionActionButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleWriteResolution();
-                        setIsResolutionExpanded(false);
-                      }}
-                    >
-                      <Text style={styles.resolutionActionText}>수정</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.resolutionActionButton}
                       onPress={async (e) => {
                         e.stopPropagation();
                         try {
@@ -866,39 +1031,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                 )}
               </TouchableOpacity>
 
-              {/* 수정 모드 시 입력창 표시 */}
-              {isWritingResolution && (
-                <View style={styles.resolutionWriteSection}>
-                  <TextInput
-                    style={styles.resolutionTextInput}
-                    placeholder="각오/다짐을 입력해주세요 (최대 100자)"
-                    value={resolutionText}
-                    onChangeText={setResolutionText}
-                    multiline
-                    maxLength={100}
-                    placeholderTextColor="#999"
-                  />
-                  <Text style={styles.resolutionCharCount}>
-                    {resolutionText.length}/100
-                  </Text>
-                  <View style={styles.resolutionWriteActions}>
-                    <TouchableOpacity
-                      style={styles.resolutionCancelButton}
-                      onPress={handleCancelResolution}
-                    >
-                      <Text style={styles.resolutionCancelButtonText}>
-                        취소
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.resolutionSaveButton}
-                      onPress={handleSaveResolution}
-                    >
-                      <Text style={styles.resolutionSaveButtonText}>저장</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
+
             </View>
           )}
         </View>
@@ -1202,7 +1335,8 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
 
         {/* 수정 + 상태 */}
         <View style={styles.actions}>
-          {item.canEdit && (
+          {/* 임시: 모든 pending 목표에 수정 버튼 표시 (디버깅용) */}
+          {(item.canEdit || item.goal.status === "pending") && (
             <>
               <TouchableOpacity
                 style={styles.editButton}
@@ -1246,7 +1380,11 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
               <View style={{ width: 8 }} />
               <TouchableOpacity
                 style={styles.memoButton}
-                onPress={() => handleAddMemo(item.goal.id)}
+                onPress={() => {
+                  console.log("🔘 기록 버튼 터치됨!", item.goal.id);
+                  handleAddMemo(item.goal.id);
+                  console.log("🔘 handleAddMemo 호출 완료");
+                }}
               >
                 <Text style={styles.memoButtonText}>📝 기록</Text>
               </TouchableOpacity>
@@ -1351,6 +1489,8 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
               style={styles.recordModalTextInput}
               placeholder="오늘 하루를 기록해주세요..."
               placeholderTextColor="#999"
+              value={retrospectText}
+              onChangeText={setRetrospectText}
               multiline
               maxLength={200}
               numberOfLines={4}
@@ -1365,10 +1505,25 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.recordModalSaveButton}
-                onPress={() => {
-                  setShowDayRecordModal(false);
-                  // 간단한 저장 후 완료 알림
-                  Alert.alert("저장 완료", "수행 기록이 저장되었습니다!");
+                onPress={async () => {
+                  if (retrospectText.trim().length === 0) {
+                    Alert.alert("알림", "회고 내용을 입력해주세요.");
+                    return;
+                  }
+                  
+                  try {
+                    const { todayKey } = getCurrentDateKeys();
+                    await saveRetrospect(retrospectText.trim());
+                    setShowDayRecordModal(false);
+                    setRetrospectText("");
+                    Alert.alert("저장 완료", "오늘의 기록이 저장되었습니다!");
+                    
+                    // 회고 상태 새로고침
+                    await fetchToday();
+                  } catch (error) {
+                    console.error("회고 저장 실패:", error);
+                    Alert.alert("오류", "기록 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
+                  }
                 }}
               >
                 <Text style={styles.recordModalSaveText}>저장</Text>
@@ -2135,27 +2290,28 @@ const styles = StyleSheet.create({
   // 메모 모달 스타일
   modalOverlay: {
     flex: 1,
-    backgroundColor: "#007AFF",
-    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
     alignItems: "center",
   },
   modalContent: {
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    padding: 8,
-    width: "90%",
-    maxWidth: 400,
+    backgroundColor: "#2C2C2E",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    width: "100%",
+    maxHeight: "80%",
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
+    color: "#FFFFFF",
     marginBottom: 8,
     textAlign: "center",
   },
   modalSubtitle: {
     fontSize: 14,
-    color: "#666",
+    color: "#CCCCCC",
     marginBottom: 16,
     textAlign: "center",
   },
@@ -2173,7 +2329,7 @@ const styles = StyleSheet.create({
   },
   memoCharCount: {
     fontSize: 12,
-    color: "#999",
+    color: "#AAAAAA",
     textAlign: "right",
     marginBottom: 16,
   },
@@ -2250,10 +2406,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#7B68EE",
+    backgroundColor: "#556B2F",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#7B68EE",
+    shadowColor: "#556B2F",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -2297,7 +2453,7 @@ const styles = StyleSheet.create({
   },
 
   dreamSaveButton: {
-    backgroundColor: "#7B68EE",
+    backgroundColor: "#556B2F",
   },
 
   dreamSaveButtonText: {
@@ -2357,11 +2513,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 20,
-    backgroundColor: "#7B68EE",
+    backgroundColor: "#556B2F",
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#7B68EE",
+    shadowColor: "#556B2F",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -2373,5 +2529,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     letterSpacing: 0.3,
+  },
+
+  // 각오 안내 문구 스타일
+  resolutionGuideContainer: {
+    backgroundColor: "#1A1A1C",
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    marginVertical: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#3A3A3C",
+  },
+
+  resolutionGuideText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 6,
+    letterSpacing: 0.3,
+  },
+
+  resolutionGuideSubText: {
+    fontSize: 13,
+    fontWeight: "400",
+    color: "#9B9B9D",
+    textAlign: "center",
+    lineHeight: 18,
+    letterSpacing: 0.2,
   },
 });

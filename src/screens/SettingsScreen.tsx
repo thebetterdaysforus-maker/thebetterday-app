@@ -12,7 +12,10 @@ import {
   Modal,
   StatusBar,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../supabaseClient";
 import { useAuthStore } from "../store/authStore";
@@ -48,7 +51,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     vibrationEnabled: true,
   });
   // 시간대 설정 기능 제거됨 - 한국 시간으로 고정
-  const [showSoundModeModal, setShowSoundModeModal] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -135,59 +137,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     }
   };
 
-  // 사운드 모드 설명 텍스트
-  const getSoundModeDescription = () => {
-    if (notifications.soundEnabled && notifications.vibrationEnabled) {
-      return "소리 + 진동";
-    } else if (notifications.soundEnabled && !notifications.vibrationEnabled) {
-      return "소리만";
-    } else if (!notifications.soundEnabled && notifications.vibrationEnabled) {
-      return "진동만";
-    } else {
-      return "무음";
-    }
-  };
-
-  // 사운드 모드 아이콘
-  const getSoundModeIcon = () => {
-    if (notifications.soundEnabled && notifications.vibrationEnabled) {
-      return "notifications";
-    } else if (notifications.soundEnabled && !notifications.vibrationEnabled) {
-      return "volume-high";
-    } else if (!notifications.soundEnabled && notifications.vibrationEnabled) {
-      return "phone-portrait";
-    } else {
-      return "volume-mute";
-    }
-  };
-
-  // 사운드 모드 변경
-  const changeSoundMode = (mode: string) => {
-    let newSettings = { ...notifications };
-
-    switch (mode) {
-      case "sound_vibration":
-        newSettings.soundEnabled = true;
-        newSettings.vibrationEnabled = true;
-        break;
-      case "sound_only":
-        newSettings.soundEnabled = true;
-        newSettings.vibrationEnabled = false;
-        break;
-      case "vibration_only":
-        newSettings.soundEnabled = false;
-        newSettings.vibrationEnabled = true;
-        break;
-      case "silent":
-        newSettings.soundEnabled = false;
-        newSettings.vibrationEnabled = false;
-        break;
-    }
-
-    saveNotificationSettings(newSettings);
-    setShowSoundModeModal(false);
-  };
-
   // 시간대 설정 로드 함수 제거됨
 
   // 시간대 설정 기능 제거됨
@@ -228,15 +177,17 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           text: "이동하기",
           onPress: () => {
             // React Native에서 외부 URL 열기
-            import('expo-web-browser').then((WebBrowser) => {
-              WebBrowser.openBrowserAsync(contactUrl);
-            }).catch((error) => {
-              console.error("웹브라우저 열기 실패:", error);
-              Alert.alert("오류", "웹페이지를 열 수 없습니다.");
-            });
-          }
-        }
-      ]
+            import("expo-web-browser")
+              .then((WebBrowser) => {
+                WebBrowser.openBrowserAsync(contactUrl);
+              })
+              .catch((error) => {
+                console.error("웹브라우저 열기 실패:", error);
+                Alert.alert("오류", "웹페이지를 열 수 없습니다.");
+              });
+          },
+        },
+      ],
     );
   };
 
@@ -430,11 +381,17 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   };
 
   const showTermsOfService = () => {
-    Alert.alert("이용약관", "이용약관은 웹사이트에서 확인하실 수 있습니다.\nhttps://www.notion.so/2418f860031d80789588dac58ad3d624");
+    Alert.alert(
+      "이용약관",
+      "이용약관은 웹사이트에서 확인하실 수 있습니다.\nhttps://www.notion.so/2418f860031d80789588dac58ad3d624",
+    );
   };
 
   const showPrivacyPolicy = () => {
-    Alert.alert("개인정보 처리방침", "개인정보 처리방침은 웹사이트에서 확인하실 수 있습니다.\nhttps://www.notion.so/2418f860031d8006b232f13ed101cc77");
+    Alert.alert(
+      "개인정보 처리방침",
+      "개인정보 처리방침은 웹사이트에서 확인하실 수 있습니다.\nhttps://www.notion.so/2418f860031d8006b232f13ed101cc77",
+    );
   };
 
   // 커스텀 스위치 컴포넌트
@@ -525,7 +482,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   );
 
   const insets = useSafeAreaInsets();
-  
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
@@ -574,16 +531,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               />
             }
           />
-
-          {/* 알림 사운드 모드 선택 */}
-          {(notifications.goalAlarms || notifications.retrospectReminders) && (
-            <SettingItem
-              title="알림 사운드 모드"
-              subtitle={getSoundModeDescription()}
-              icon={getSoundModeIcon()}
-              onPress={() => setShowSoundModeModal(true)}
-            />
-          )}
         </View>
 
         {/* 데이터 관리 */}
@@ -684,122 +631,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             style={styles.footerLogo}
             resizeMode="contain"
           />
-          <Text style={styles.footerSubtext}>행복할 우리의 그날을 위해</Text>
+          <Text style={styles.footerSubtext}>행복한 우리의 그날을 위해</Text>
         </View>
       </ScrollView>
 
       {/* 시간대 선택 모달 제거됨 - 한국 시간으로 고정 */}
-
-      {/* 사운드 모드 선택 모달 */}
-      <Modal
-        visible={showSoundModeModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowSoundModeModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>알림 사운드 모드</Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setShowSoundModeModal(false)}
-              >
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.soundModeList}>
-              <TouchableOpacity
-                style={[
-                  styles.soundModeItem,
-                  notifications.soundEnabled &&
-                    notifications.vibrationEnabled &&
-                    styles.selectedSoundMode,
-                ]}
-                onPress={() => changeSoundMode("sound_vibration")}
-              >
-                <Ionicons name="notifications" size={24} color="#7B68EE" />
-                <View style={styles.soundModeText}>
-                  <Text style={styles.soundModeTitle}>소리 + 진동</Text>
-                  <Text style={styles.soundModeDescription}>
-                    알림음과 진동을 모두 사용
-                  </Text>
-                </View>
-                {notifications.soundEnabled &&
-                  notifications.vibrationEnabled && (
-                    <Ionicons name="checkmark" size={20} color="#7B68EE" />
-                  )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.soundModeItem,
-                  notifications.soundEnabled &&
-                    !notifications.vibrationEnabled &&
-                    styles.selectedSoundMode,
-                ]}
-                onPress={() => changeSoundMode("sound_only")}
-              >
-                <Ionicons name="volume-high" size={24} color="#4ECDC4" />
-                <View style={styles.soundModeText}>
-                  <Text style={styles.soundModeTitle}>소리만</Text>
-                  <Text style={styles.soundModeDescription}>
-                    알림음만 사용, 진동 없음
-                  </Text>
-                </View>
-                {notifications.soundEnabled &&
-                  !notifications.vibrationEnabled && (
-                    <Ionicons name="checkmark" size={20} color="#7B68EE" />
-                  )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.soundModeItem,
-                  !notifications.soundEnabled &&
-                    notifications.vibrationEnabled &&
-                    styles.selectedSoundMode,
-                ]}
-                onPress={() => changeSoundMode("vibration_only")}
-              >
-                <Ionicons name="phone-portrait" size={24} color="#FF9500" />
-                <View style={styles.soundModeText}>
-                  <Text style={styles.soundModeTitle}>진동만</Text>
-                  <Text style={styles.soundModeDescription}>
-                    진동만 사용, 소리 없음
-                  </Text>
-                </View>
-                {!notifications.soundEnabled &&
-                  notifications.vibrationEnabled && (
-                    <Ionicons name="checkmark" size={20} color="#7B68EE" />
-                  )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.soundModeItem,
-                  !notifications.soundEnabled &&
-                    !notifications.vibrationEnabled &&
-                    styles.selectedSoundMode,
-                ]}
-                onPress={() => changeSoundMode("silent")}
-              >
-                <Ionicons name="volume-mute" size={24} color="#999" />
-                <View style={styles.soundModeText}>
-                  <Text style={styles.soundModeTitle}>무음</Text>
-                  <Text style={styles.soundModeDescription}>
-                    소리와 진동을 모두 비활성화
-                  </Text>
-                </View>
-                {!notifications.soundEnabled &&
-                  !notifications.vibrationEnabled && (
-                    <Ionicons name="checkmark" size={20} color="#7B68EE" />
-                  )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* 사운드 모드 선택 모달 제거됨 - 텍스트 전용 고정 */}
     </View>
   );
 }
@@ -997,31 +834,4 @@ const styles = StyleSheet.create({
     color: "#007AFF",
   },
   // 사운드 모드 모달 스타일
-  soundModeList: {
-    paddingVertical: 10,
-  },
-  soundModeItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
-  },
-  selectedSoundMode: {
-    backgroundColor: "#f0f8ff",
-  },
-  soundModeText: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  soundModeTitle: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#333",
-  },
-  soundModeDescription: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 2,
-  },
 });
