@@ -30,11 +30,11 @@ config.resolver.alias = {
   '@supabase/node-fetch': require.resolve('cross-fetch'),
   'node-fetch': require.resolve('cross-fetch'),
   'stream': require.resolve('stream-browserify'),
-  // Supabase 의존성 해결
-  '@supabase/postgrest-js': '@supabase/postgrest-js',
-  '@supabase/gotrue-js': '@supabase/gotrue-js',
-  '@supabase/realtime-js': '@supabase/realtime-js',
-  '@supabase/storage-js': '@supabase/storage-js',
+  // Supabase 의존성 강제 해결
+  '@supabase/postgrest-js': require.resolve('@supabase/postgrest-js'),
+  '@supabase/gotrue-js': require.resolve('@supabase/gotrue-js'),
+  '@supabase/realtime-js': require.resolve('@supabase/realtime-js'),
+  '@supabase/storage-js': require.resolve('@supabase/storage-js'),
 };
 
 // Package Exports 비활성화 - date-fns 호환성 문제 해결
@@ -43,33 +43,18 @@ config.resolver.unstable_enablePackageExports = false;
 // Optimize bundle loading
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
-// 커스텀 resolveRequest로 특정 모듈을 대체 (더 강력한 차단)
-const originalResolveRequest = config.resolver.resolveRequest;
+// 간소화된 resolve 설정
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  // @supabase/node-fetch 모든 변형 차단
-  if (moduleName.includes('@supabase/node-fetch') || 
-      moduleName.includes('node-fetch') ||
-      moduleName.includes('supabase') && moduleName.includes('fetch')) {
+  // node-fetch 차단
+  if (moduleName.includes('node-fetch')) {
     return context.resolveRequest(context, 'cross-fetch', platform);
   }
   // ws 모듈 차단
-  if (moduleName === 'ws' || moduleName.includes('/ws/') || moduleName.includes('\\ws\\')) {
-    return {
-      type: 'empty',
-    };
-  }
-  // stream 모듈을 직접 요청하는 경우도 차단
-  if (moduleName === 'stream') {
-    return context.resolveRequest(context, 'readable-stream', platform);
-  }
-  // crypto 모듈 강제 매핑
-  if (moduleName === 'crypto') {
-    return context.resolveRequest(context, 'crypto-browserify', platform);
+  if (moduleName === 'ws') {
+    return { type: 'empty' };
   }
   
-  return originalResolveRequest
-    ? originalResolveRequest(context, moduleName, platform)
-    : context.resolveRequest(context, moduleName, platform);
+  return context.resolveRequest(context, moduleName, platform);
 };
 
 // 개발 환경에서 불필요한 파일 제외 (정리된 구조 반영)
