@@ -1,9 +1,9 @@
-// 🔔 단순화된 알림 관리자 - 목표당 2개 알림 시스템
+// 🔔 단순화된 알림 관리자 - 목표시간 -5분 단일 알림
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NOTIFICATION_MESSAGES, getRandomNotificationMessage } from '../data/notificationMessages';
+import { NOTIFICATION_MESSAGES } from '../data/notificationMessages';
 
 // 비동기로 사용자 닉네임 가져오기 - Supabase profiles 테이블에서 조회
 const getUserDisplayName = async (): Promise<string> => {
@@ -34,15 +34,32 @@ const getUserDisplayName = async (): Promise<string> => {
   }
 };
 
-
+// 랜덤 알림 메시지 가져오기 함수 - 사용자 닉네임 비동기 치환
+const getRandomNotificationMessage = async (type: 'general' | 'goal' = 'general'): Promise<string> => {
+  const filteredMessages = NOTIFICATION_MESSAGES.filter(msg => msg.type === type);
+  const randomMessage = filteredMessages[Math.floor(Math.random() * filteredMessages.length)];
+  
+  if (!randomMessage) return '목표를 달성해보세요!';
+  
+  let message = randomMessage.message;
+  
+  // 사용자 닉네임 치환
+  if (message.includes('{display_name}')) {
+    const displayName = await getUserDisplayName();
+    message = message.replace(/\{display_name\}/g, displayName);
+    if (__DEV__) console.log(`📝 알림 메시지 치환: "${displayName}" 적용`);
+  }
+  
+  return message;
+};
 
 // Expo Go 환경 감지
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
 /**
  * 단순화된 알림 관리자
- * - 목표당 정확히 2개 알림 (준비 -5분, 실행 +3분)
- * - 중복 방지 및 환경 자동 감지
+ * - 목표당 1개 알림 (목표시간 -5분)
+ * - 회고록 조건부 알림 (미작성 시 30분 후)
  * - 기존 notificationMessages.ts 활용
  */
 export class SimpleNotificationManager {
@@ -71,9 +88,7 @@ export class SimpleNotificationManager {
     }
 
     if (isExpoGo) {
-      if (__DEV__) console.log('📱 Expo Go 환경 - 알림 시스템 제한적 사용');
-      // Expo Go에서는 알림 스케줄링 문제가 있을 수 있음
-      console.warn('⚠️ Expo Go에서는 알림이 정상 작동하지 않을 수 있습니다. Development Build 권장');
+      if (__DEV__) console.log('📱 Expo Go 환경 - 로컬 알림만 사용');
     } else {
       if (__DEV__) console.log('🔧 Development Build 환경 - 전체 알림 기능 사용');
     }
@@ -87,7 +102,7 @@ export class SimpleNotificationManager {
             shouldShowAlert: true,
             shouldShowBanner: true,
             shouldShowList: true,
-            shouldPlaySound: settings?.soundEnabled !== false,
+            shouldPlaySound: false,
             shouldSetBadge: true,
           };
         },
@@ -128,7 +143,7 @@ export class SimpleNotificationManager {
   }
 
   /**
-   * 목표 알림 스케줄링 (2단계: -5분, +3분)
+   * 목표 알림 스케줄링 (단일 알림: 목표시간 -5분)
    */
   async scheduleGoalNotification(
     goalId: string,
@@ -140,99 +155,63 @@ export class SimpleNotificationManager {
       return;
     }
 
-    // 🔥 한국 시간 고정 시스템으로 변경
-    const { getKoreaTime } = await import('../utils/timeUtils');
+    // 🔥 한국 시간 기준으로 정확한 시간 비교
+    const nowKorea = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    const targetKorea = new Date(targetTime.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     
-    const nowKorea = getKoreaTime();
-    // targetTime이 이미 UTC로 저장되어 있으므로 그대로 사용
-    const targetKorea = new Date(targetTime);
+    if (__DEV__) console.log('⏰ 알림 시간 검증:', {
+      현재한국시간: nowKorea.toLocaleString('ko-KR'),
+      목표한국시간: targetKorea.toLocaleString('ko-KR'),
+      UTC목표시간: targetTime.toISOString(),
+      지났는지: targetKorea <= nowKorea
+    });
     
-    // 현재 시간과 목표 시간의 차이를 분 단위로 계산
-    const timeDifferenceMinutes = (targetKorea.getTime() - nowKorea.getTime()) / (1000 * 60);
-    
-    if (__DEV__) console.log(`⏰ 알림 시간 검증: 목표까지 ${Math.round(timeDifferenceMinutes)}분 남음`);
-    
-    // 목표 시간이 이미 지났거나 10분 이내인 경우 알림 설정 안함 (알림 스팸 방지)
-    if (targetKorea <= nowKorea || timeDifferenceMinutes <= 10) {
-      if (__DEV__) console.log(`⏰ 목표 시간이 너무 가깝거나 지나서 알림 설정 안함 (차이: ${Math.round(timeDifferenceMinutes)}분) - 알림 스팸 방지`);
+    if (targetKorea <= nowKorea) {
+      if (__DEV__) console.log('⏰ 목표 시간이 이미 지나서 알림 설정 안함');
       return;
     }
 
-    // 사용자 알림 설정 확인 - 기본값은 항상 활성화
+    // 사용자 알림 설정 확인
     const settings = await this.getNotificationSettings();
-    
-    // 사용자가 명시적으로 OFF한 경우에만 비활성화
-    if (settings?.goalAlarms === false) {
+    if (!settings?.goalAlarms) {
       if (__DEV__) console.log('🔕 목표 알림 비활성화됨');
       return;
     }
-
-    // 🔔 알림 권한 요청 및 확인
-    const hasPermission = await this.requestPermission();
-    if (!hasPermission) {
-      if (__DEV__) console.log('🚫 알림 권한 거부됨 - 스케줄링 중단');
-      return;
-    }
-    if (__DEV__) console.log('✅ 알림 권한 확인 완료');
 
     try {
       // 기존 목표 알림 취소 (중복 방지)
       await this.cancelGoalNotifications(goalId);
 
-      // 🔔 정확한 -5분, +3분 알림 시스템 (한국 시간 기준)
-      // 1. 준비 알림 (목표 시간 -5분) - 확인 버튼 활성화 시점
-      const prepareTime = new Date(targetTime.getTime() - 5 * 60 * 1000);
+      // 🔔 목표 시간 -5분에 단일 알림 (한국시간 기준)
+      const notifyTime = new Date(targetTime.getTime() - 5 * 60 * 1000);
+      const notifyTimeKorea = new Date(notifyTime.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
       
-      if (prepareTime > nowKorea) {
-        const prepareMessage = await getRandomNotificationMessage(title);
+      if (notifyTimeKorea > nowKorea) {
+        const message = await getRandomNotificationMessage('general');
         await Notifications.scheduleNotificationAsync({
-          identifier: `goal_prepare_${goalId}`,
+          identifier: `goal_${goalId}`,
           content: {
             title: '목표 달성 시간입니다!',
-            body: prepareMessage,
-            sound: 'default',
+            body: message,
+            sound: false,
             data: {
               goalId,
-              type: 'prepare',
+              type: 'goal',
               targetTime: targetTime.toISOString(),
             },
           },
-          trigger: { date: prepareTime } as any,
+          trigger: { date: notifyTime } as any,
         });
 
-        if (__DEV__) console.log(`🔔 준비 알림 설정: ${prepareTime.toLocaleString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`);
+        if (__DEV__) console.log(`🔔 목표 알림 설정 완료: ${notifyTime.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
       } else {
-        if (__DEV__) console.log(`⏰ 준비 알림 시간 지남 - 설정 안함`);
+        if (__DEV__) console.log(`⏰ 알림 시간 지남 (설정 안함): ${notifyTime.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
       }
 
-      // 2. 실행 알림 (목표 시간 +3분) - 실행 시점
-      const executeTime = new Date(targetTime.getTime() + 3 * 60 * 1000);
-      const executeMessage = await getRandomNotificationMessage(title);
-      await Notifications.scheduleNotificationAsync({
-        identifier: `goal_execute_${goalId}`,
-        content: {
-          title: '목표 달성 시간입니다!',
-          body: executeMessage,
-          sound: 'default',
-          data: {
-            goalId,
-            type: 'execute',
-            targetTime: targetTime.toISOString(),
-          },
-        },
-        trigger: { date: executeTime } as any,
-      });
-
-      if (__DEV__) console.log(`🎯 실행 알림 설정: ${executeTime.toLocaleString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`);
-      if (__DEV__) console.log(`✅ "${title}" 알림 완료`);
+      if (__DEV__) console.log(`✅ 목표 "${title}" 알림 스케줄링 완료`);
       
-      // Expo Go 환경에서는 알림 검증을 건너뛰고 정상 완료 처리
-      if (isExpoGo) {
-        if (__DEV__) console.log('📱 Expo Go 환경 - 알림 검증 건너뛰고 완료 처리');
-      } else {
-        // Development Build에서만 알림 검증
-        setTimeout(() => this.getAllScheduledNotifications(), 2000);
-      }
+      // 디버깅용 - 설정된 알림 즉시 확인
+      setTimeout(() => this.getAllScheduledNotifications(), 1000);
 
     } catch (error) {
       console.error('❌ 목표 알림 스케줄링 실패:', error);
@@ -246,8 +225,7 @@ export class SimpleNotificationManager {
     if (!this.canUseNotifications) return;
 
     try {
-      await Notifications.cancelScheduledNotificationAsync(`goal_prepare_${goalId}`);
-      await Notifications.cancelScheduledNotificationAsync(`goal_execute_${goalId}`);
+      await Notifications.cancelScheduledNotificationAsync(`goal_${goalId}`);
       if (__DEV__) console.log(`🔕 목표 ${goalId} 알림 취소 완료`);
     } catch (error) {
       console.error('❌ 목표 알림 취소 실패:', error);
@@ -255,13 +233,15 @@ export class SimpleNotificationManager {
   }
 
   /**
-   * 회고 알림 스케줄링
+   * 회고 알림 스케줄링 (조건부: 회고록 미작성 시에만)
    */
   async scheduleRetrospectNotification(targetTime: Date): Promise<void> {
     if (!this.canUseNotifications) return;
 
-    const now = new Date();
-    if (targetTime <= now) {
+    const nowKorea = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    const targetKorea = new Date(targetTime.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    
+    if (targetKorea <= nowKorea) {
       if (__DEV__) console.log('⏰ 회고 시간이 이미 지나서 알림 설정 안함');
       return;
     }
@@ -280,7 +260,7 @@ export class SimpleNotificationManager {
         content: {
           title: '오늘의 회고 시간입니다',
           body: '오늘 하루를 돌아보며 성장의 기록을 남겨보세요',
-          sound: 'default',
+          sound: false,
           data: {
             type: 'retrospect',
           },
@@ -288,9 +268,23 @@ export class SimpleNotificationManager {
         trigger: { date: targetTime } as any,
       });
 
-      if (__DEV__) console.log(`📝 회고 알림 설정: ${targetTime.toLocaleTimeString('ko-KR')}`);
+      if (__DEV__) console.log(`📝 회고 알림 설정: ${targetTime.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
     } catch (error) {
       console.error('❌ 회고 알림 스케줄링 실패:', error);
+    }
+  }
+
+  /**
+   * 회고 알림 취소 (회고록 작성 완료 시)
+   */
+  async cancelRetrospectNotification(): Promise<void> {
+    if (!this.canUseNotifications) return;
+
+    try {
+      await Notifications.cancelScheduledNotificationAsync('retrospect-reminder');
+      if (__DEV__) console.log('📝 회고 알림 취소 완료 (회고록 작성됨)');
+    } catch (error) {
+      console.error('❌ 회고 알림 취소 실패:', error);
     }
   }
 
@@ -322,11 +316,7 @@ export class SimpleNotificationManager {
       console.log(`🔔 예약된 알림 총 ${notifications.length}개:`);
       
       if (notifications.length === 0) {
-        if (isExpoGo) {
-          console.log('📱 Expo Go 환경 - 알림 스케줄링은 정상이지만 로컬 알림 제한으로 인해 표시되지 않을 수 있음');
-        } else {
-          console.log('📭 예약된 알림이 없습니다 - 알림 스케줄링 문제 가능성 있음');
-        }
+        console.log('📭 예약된 알림이 없습니다');
         return;
       }
 
@@ -368,15 +358,14 @@ export class SimpleNotificationManager {
   private async getNotificationSettings(): Promise<any> {
     try {
       const settingsString = await AsyncStorage.getItem('notificationSettings');
-      const defaultSettings = {
-        goalAlarms: true,  // 항상 기본값은 활성화
+      return settingsString ? JSON.parse(settingsString) : {
+        goalAlarms: true,
         retrospectReminders: true,
         soundEnabled: true,
       };
-      return settingsString ? { ...defaultSettings, ...JSON.parse(settingsString) } : defaultSettings;
     } catch (error) {
       return {
-        goalAlarms: true,  // 오류 시에도 활성화
+        goalAlarms: true,
         retrospectReminders: true,
         soundEnabled: true,
       };

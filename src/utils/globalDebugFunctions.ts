@@ -1,5 +1,4 @@
-// 🔧 전역 디버깅 함수들 - 통합 관리
-import { simpleNotificationManager } from './simpleNotificationManager';
+// 🔧 전역 디버깅 함수들 - 알림 시스템 비활성화됨
 
 /**
  * 전역 디버깅 함수들을 window 객체에 등록
@@ -7,15 +6,13 @@ import { simpleNotificationManager } from './simpleNotificationManager';
  */
 export const registerGlobalDebugFunctions = () => {
   if (__DEV__ && typeof window !== 'undefined') {
-    // 알림 확인 및 관리 함수들
+    // 알림 시스템 비활성화됨
     (window as any).checkNotifications = async () => {
-      console.log('🔍 현재 예약된 알림 확인 시작');
-      await simpleNotificationManager.getAllScheduledNotifications();
+      console.log('🔕 알림 시스템 비활성화됨');
     };
 
     (window as any).clearAllNotifications = async () => {
-      console.log('🧹 모든 알림 삭제 시작');
-      await simpleNotificationManager.cancelAllNotifications();
+      console.log('🔕 알림 시스템 비활성화됨');
     };
 
     // 시간 디버깅 함수
@@ -58,14 +55,13 @@ export const registerGlobalDebugFunctions = () => {
 
     // 레거시 함수들 (호환성 유지)
     (window as any).emergencyCleanupNotifications = async () => {
-      console.log('🚨 긴급 알림 정리 시작');
-      await simpleNotificationManager.cancelAllNotifications();
+      console.log('🔕 알림 시스템 비활성화됨');
     };
 
     console.log('🔧 디버깅용 함수 등록 완료');
     console.log('💡 사용 가능한 함수:');
-    console.log('  - checkNotifications() : 예약된 알림 확인');
-    console.log('  - clearAllNotifications() : 모든 알림 삭제');
+    console.log('  - checkNotifications() : 알림 시스템 비활성화됨');
+    console.log('  - clearAllNotifications() : 알림 시스템 비활성화됨');
     console.log('  - checkTime() : 현재 시간 정보 확인');
     console.log('  - forceExpireGoals() : 목표 만료 강제 실행');
   }

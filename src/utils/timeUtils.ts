@@ -4,126 +4,54 @@
  * 프로젝트 전체에서 일관된 시간 처리를 위한 공통 함수
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// 지원하는 시간대 목록
-export const SUPPORTED_TIMEZONES = {
-  'Asia/Seoul': { name: '한국 (KST)', offset: '+09:00' },
-  'Asia/Tokyo': { name: '일본 (JST)', offset: '+09:00' },
-  'Asia/Shanghai': { name: '중국 (CST)', offset: '+08:00' },
-  'America/New_York': { name: '미국 동부 (EST/EDT)', offset: '-05:00/-04:00' },
-  'America/Los_Angeles': { name: '미국 서부 (PST/PDT)', offset: '-08:00/-07:00' },
-  'Europe/London': { name: '영국 (GMT/BST)', offset: '+00:00/+01:00' },
-};
-
-let currentTimeZone = 'Asia/Seoul'; // 기본값
-
-/**
- * 현재 설정된 시간대 가져오기
- */
-export async function getCurrentTimeZone(): Promise<string> {
-  try {
-    const savedTimeZone = await AsyncStorage.getItem('userTimeZone');
-    if (savedTimeZone && SUPPORTED_TIMEZONES[savedTimeZone as keyof typeof SUPPORTED_TIMEZONES]) {
-      currentTimeZone = savedTimeZone;
-    }
-  } catch (error) {
-    console.log('시간대 설정 로드 실패, 기본값 사용:', error);
-  }
-  return currentTimeZone;
-}
-
-/**
- * 시간대 설정 저장
- */
-export async function setCurrentTimeZone(timeZone: string): Promise<void> {
-  try {
-    if (SUPPORTED_TIMEZONES[timeZone as keyof typeof SUPPORTED_TIMEZONES]) {
-      currentTimeZone = timeZone;
-      await AsyncStorage.setItem('userTimeZone', timeZone);
-    }
-  } catch (error) {
-    console.error('시간대 설정 저장 실패:', error);
-  }
-}
+// 한국 시간 전용 시스템 - 시간대 설정 기능 제거
 
 /**
  * 현재 설정된 시간대의 시간을 반환
  */
 export function getCurrentTime(): Date {
-  try {
-    // 시간대 유효성 검증
-    if (!SUPPORTED_TIMEZONES[currentTimeZone as keyof typeof SUPPORTED_TIMEZONES]) {
-      console.warn(`⚠️ 무효한 시간대 감지: ${currentTimeZone}, 기본값(Asia/Seoul) 사용`);
-      currentTimeZone = 'Asia/Seoul';
-    }
-    
-    // 설정된 시간대 기준으로 현재 시간 반환
-    const now = new Date();
-    const timeInSelectedZone = new Date(now.toLocaleString("en-US", { timeZone: currentTimeZone }));
-    
-    if (__DEV__) {
-      console.log('🕐 현재 시간 계산:', {
-        설정된시간대: currentTimeZone,
-        UTC시간: now.toISOString(),
-        해당시간대시간: timeInSelectedZone.toLocaleString(),
-      });
-    }
-    
-    return timeInSelectedZone;
-  } catch (error) {
-    console.error('❌ 시간대 처리 오류:', error);
-    console.warn('🔄 기본 시간대(Asia/Seoul)로 폴백');
-    
-    // 폴백: 한국 시간 반환
-    return getKoreaTime();
-  }
+  // 한국 시간으로 고정 (시간대 설정 기능 제거)
+  return getKoreaTime();
 }
 
 /**
- * 현재 한국 시간을 반환 (하위 호환성)
+ * 현재 한국 시간을 반환 (UTC+9 고정)
  */
 export function getKoreaTime(): Date {
   const now = new Date();
   
-  // 한국 시간대로 변환
-  const koreaOffset = 9 * 60; // KST는 UTC+9
+  // UTC 오프셋 방식으로 안정적인 한국 시간 계산
   const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const koreaTime = new Date(utcTime + (koreaOffset * 60000));
+  const koreaTime = new Date(utcTime + (9 * 60 * 60 * 1000));
   
   return koreaTime;
 }
 
 /**
  * 현재 시간대 기준 오늘 날짜를 YYYY-MM-DD 형식으로 반환
+ * @deprecated getTodayKorea() 사용 권장
  */
 export function getToday(): string {
-  const currentTime = getCurrentTime();
-  return currentTime.toISOString().slice(0, 10);
+  return getTodayKorea();
 }
 
 /**
  * 현재 시간대 기준 내일 날짜를 YYYY-MM-DD 형식으로 반환
+ * @deprecated getTomorrowKorea() 사용 권장
  */
 export function getTomorrow(): string {
-  const currentTime = getCurrentTime();
-  const tomorrow = new Date(currentTime.getTime() + 86400000);
-  return tomorrow.toISOString().slice(0, 10);
+  return getTomorrowKorea();
 }
 
 /**
- * 한국 시간 기준 오늘 날짜를 YYYY-MM-DD 형식으로 반환 (하위 호환성)
+ * 한국 시간 기준 오늘 날짜를 YYYY-MM-DD 형식으로 반환
  */
 export function getTodayKorea(): string {
-  // 강제로 현재 한국 시간 계산
-  const now = new Date();
-  const koreaOffset = 9 * 60; // KST는 UTC+9
-  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const koreaTime = new Date(utcTime + (koreaOffset * 60000));
+  // UTC 오프셋 방식으로 안정적인 한국 시간 계산
+  const koreaTime = getKoreaTime();
   
   if (__DEV__) {
     console.log('🕐 getTodayKorea 호출:', {
-      UTC시간: now.toISOString(),
       한국시간: koreaTime.toISOString(),
       반환값: koreaTime.toISOString().slice(0, 10)
     });
@@ -133,26 +61,28 @@ export function getTodayKorea(): string {
 }
 
 /**
- * 한국 시간 기준 내일 날짜를 YYYY-MM-DD 형식으로 반환 (하위 호환성)
+ * 🔥 APK 정확한 D+1 한국 시간 내일 날짜 계산
  */
 export function getTomorrowKorea(): string {
-  // 강제로 현재 한국 시간 계산
   const now = new Date();
-  const koreaOffset = 9 * 60; // KST는 UTC+9
-  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const koreaTime = new Date(utcTime + (koreaOffset * 60000));
-  const tomorrow = new Date(koreaTime.getTime() + 86400000);
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const koreaTime = new Date(utc + (9 * 60 * 60 * 1000));
+  
+  // 정확한 내일 계산
+  const tomorrow = new Date(koreaTime);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const result = tomorrow.toISOString().slice(0, 10);
   
   if (__DEV__) {
-    console.log('🕐 getTomorrowKorea 호출:', {
-      UTC시간: now.toISOString(),
-      한국시간: koreaTime.toISOString(),
-      내일: tomorrow.toISOString(),
-      반환값: tomorrow.toISOString().slice(0, 10)
+    console.log('🇰🇷 APK D+1 계산:', {
+      현재한국: koreaTime.toLocaleString('ko-KR'),
+      내일한국: tomorrow.toLocaleString('ko-KR'),
+      결과: result
     });
   }
   
-  return tomorrow.toISOString().slice(0, 10);
+  return result;
 }
 
 /**
@@ -187,42 +117,26 @@ export function isTomorrowKorea(dateString: string): boolean {
  * Date 객체를 현재 시간대로 변환
  */
 export function toCurrentTime(date: Date): Date {
-  const timeString = date.toLocaleString("en-CA", {
-    timeZone: currentTimeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false
-  });
-  return new Date(timeString.replace(", ", "T"));
+  // 한국 시간으로 고정 변환
+  return toKoreaTime(date);
 }
 
 /**
- * 현재 시간대 기준으로 날짜 문자열 생성 (YYYY-MM-DD)
+ * 한국 시간 기준으로 날짜 문자열 생성 (YYYY-MM-DD)
  */
 export function formatDate(date: Date): string {
-  const currentDate = toCurrentTime(date);
-  return currentDate.toISOString().slice(0, 10);
+  const koreaDate = toKoreaTime(date);
+  return koreaDate.toISOString().slice(0, 10);
 }
 
 /**
  * Date 객체를 한국 시간으로 변환 (하위 호환성)
  */
 export function toKoreaTime(date: Date): Date {
-  const koreaTimeString = date.toLocaleString("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false
-  });
-  return new Date(koreaTimeString.replace(", ", "T"));
+  // UTC 오프셋 방식으로 안정적인 한국 시간 변환
+  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const koreaTime = new Date(utcTime + (9 * 60 * 60 * 1000));
+  return koreaTime;
 }
 
 /**
