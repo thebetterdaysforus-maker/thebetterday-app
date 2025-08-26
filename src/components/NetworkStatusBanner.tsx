@@ -12,7 +12,7 @@ export const NetworkStatusBanner: React.FC<NetworkStatusBannerProps> = ({ style 
   const [syncQueueCount, setSyncQueueCount] = useState(0);
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    let intervalId: any;
     
     const checkNetworkStatus = async () => {
       const online = await offlineDataManager.isOnline();
@@ -26,8 +26,8 @@ export const NetworkStatusBanner: React.FC<NetworkStatusBannerProps> = ({ style 
     // 초기 체크
     checkNetworkStatus();
     
-    // 30초마다 네트워크 상태 체크
-    intervalId = setInterval(checkNetworkStatus, 30000);
+    // 5초마다 네트워크 상태 체크 (빠른 동기화)
+    intervalId = setInterval(checkNetworkStatus, 5000);
 
     return () => {
       if (intervalId) clearInterval(intervalId);

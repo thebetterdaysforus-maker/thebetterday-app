@@ -113,7 +113,7 @@ export const NotificationStatusCard: React.FC<NotificationStatusCardProps> = ({ 
             style={styles.refreshButton}
             onPress={checkNotificationStatus}
           >
-            <Ionicons name="refresh" size={16} color="#7B68EE" />
+            <Ionicons name="refresh" size={16} color="#556B2F" />
             <Text style={styles.refreshText}>상태 새로고침</Text>
           </TouchableOpacity>
         </View>
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   refreshText: {
     marginLeft: 6,
     fontSize: 14,
-    color: '#7B68EE',
+    color: '#556B2F',
     fontWeight: '500',
   },
 });

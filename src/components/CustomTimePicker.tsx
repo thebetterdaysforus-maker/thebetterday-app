@@ -84,6 +84,12 @@ export default function CustomTimePicker({
     if (checkHour === null || checkMinute === null || checkIsPM === null) {
       return false;
     }
+    // value가 유효한 Date인지 먼저 확인
+    if (!value || isNaN(value.getTime())) {
+      console.warn("⚠️ CustomTimePicker: 유효하지 않은 날짜입니다");
+      return false;
+    }
+
     const testDate = new Date(value); // value의 날짜를 기준으로 생성
     const hour24 = checkIsPM
       ? checkHour === 12
@@ -94,9 +100,15 @@ export default function CustomTimePicker({
         : checkHour;
     testDate.setHours(hour24, checkMinute, 0, 0);
 
-    // 00:00:00 방지 (Date value out of bounds 오류 방지)
+    // testDate가 유효한지 다시 확인
+    if (isNaN(testDate.getTime())) {
+      console.warn("⚠️ CustomTimePicker: 생성된 테스트 날짜가 유효하지 않습니다");
+      return false;
+    }
+
+    // 00:00:00 차단 (날짜 변경 시점 방지)
     if (hour24 === 0 && checkMinute === 0) {
-      console.log("❌ CustomTimePicker 00:00:00 선택 차단");
+      console.log("❌ CustomTimePicker 00:00:00 선택 차단 - 날짜 변경 방지");
       return false;
     }
 
@@ -108,20 +120,18 @@ export default function CustomTimePicker({
     });
     
     if (!isTomorrowMode) {
-      // UTC 오프셋 방식으로 안정적인 한국 시간 계산
-      const utcNow = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const koreanNow = new Date(utcNow + (9 * 60 * 60 * 1000));
+      // 단순한 한국 시간 계산
+      const koreanNow = new Date();
+      const testDateKorean = new Date(testDate);
       
-      const utcTest = testDate.getTime() + (testDate.getTimezoneOffset() * 60000);
-      const testDateKorean = new Date(utcTest + (9 * 60 * 60 * 1000));
-      
-      // 같은 날짜인지 확인 (한국 시간 기준)
+      // 같은 날짜인지 확인
       const isSameDay = koreanNow.toDateString() === testDateKorean.toDateString();
       
       if (isSameDay) {
         const threeHoursFromNow = new Date(koreanNow.getTime() + 3 * 60 * 60 * 1000);
         if (testDateKorean < threeHoursFromNow) {
           console.log("❌ CustomTimePicker 3시간 제약 위반:", {
+            현재시간: koreanNow.toLocaleString('ko-KR'),
             테스트시간: testDateKorean.toLocaleString('ko-KR'),
             최소시간: threeHoursFromNow.toLocaleString('ko-KR')
           });

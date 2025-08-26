@@ -1,5 +1,5 @@
 import React from 'react'
-import Navigation from './Navigation'
+import { View } from 'react-native'
 import useUserStore from '../store/userStore'
 
 interface LayoutProps {
@@ -10,12 +10,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { session } = useUserStore()
 
   return (
-    <div className="app-layout">
-      {session && <Navigation />}
-      <main className="main-content">
-        {children}
-      </main>
-    </div>
+    <View style={{ flex: 1 }}>
+      {children}
+    </View>
   )
 }
 
