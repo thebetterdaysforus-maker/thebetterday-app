@@ -81,10 +81,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
           options.signal.addEventListener('abort', () => controller.abort());
         }
         
-        // 수동 타임아웃 구현
+        // 수동 타임아웃 구현 (iOS 재시작 시 더 긴 시간 허용)
         timeoutId = setTimeout(() => {
           controller.abort();
-        }, 10000);
+        }, 20000);
         
         const response = await fetch(url, {
           ...options,
