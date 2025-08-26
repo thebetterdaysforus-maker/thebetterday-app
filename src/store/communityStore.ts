@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { supabase } from '../supabaseClient';
 import { nanoid } from 'nanoid/non-secure';
+import { getTomorrowKorea } from '../utils/timeUtils';
+import { syncOnUserAction } from '../utils/smartSyncManager';
 
 export interface DailyResolution {
   id: string;
@@ -12,6 +14,7 @@ export interface DailyResolution {
   display_name: string;
   like_count: number;
   is_liked_by_current_user: boolean;
+  is_public: boolean;
 }
 
 export type FilterType = 'recent' | 'popular' | 'random';
@@ -25,8 +28,8 @@ interface CommunityState {
   // 내 각오 관련
   fetchMyResolution: () => Promise<void>;
   saveMyResolution: (content: string) => Promise<void>;
-  updateMyResolution: (content: string) => Promise<void>;
   deleteMyResolution: () => Promise<void>;
+  toggleMyResolutionPublic: () => Promise<void>;
   
   // 커뮤니티 각오 관련
   fetchResolutions: (filter?: FilterType) => Promise<void>;
@@ -65,37 +68,6 @@ const getYesterdayString = () => {
   return koreaTimeString;
 };
 
-const getTodayStringForResolution = () => {
-  // 각오 표시용 - 당일 각오를 가져오기 위함
-  const now = new Date();
-  const koreaTimeString = now.toLocaleString("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return koreaTimeString;
-};
-
-const getTomorrowString = () => {
-  // 한국 시간 기준으로 내일 날짜 반환 (Date value out of bounds 오류 방지)
-  const now = new Date();
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const koreaTimeString = tomorrow.toLocaleString("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  if (__DEV__) {
-    console.log('🔍 getTomorrowString 계산:', { 
-      utcNow: now.toISOString(), 
-      tomorrow: koreaTimeString 
-    });
-  }
-  return koreaTimeString;
-};
-
 const useCommunityStore = create<CommunityState>((set, get) => ({
   resolutions: [],
   myResolution: null,
@@ -105,7 +77,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
   fetchMyResolution: async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const today = getTodayStringForResolution(); // 오늘 날짜 기준으로 조회 (각오는 당일에 표시되어야 함)
+      const tomorrow = getTomorrowKorea(); // D+1 로직: 내일 날짜로 조회
       
       if (session) {
         // 정식 회원 - Supabase에서 조회
@@ -113,7 +85,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
           .from('daily_resolutions')
           .select('*')
           .eq('user_id', session.user.id)
-          .eq('date', today)
+          .eq('date', tomorrow)
           .single();
 
         if (error && error.code !== 'PGRST116') {
@@ -121,7 +93,9 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
           return;
         }
 
-        set({ myResolution: data || null });
+        // is_public 기본값을 true로 설정
+        const resolutionWithPublic = data ? { ...data, is_public: true } : null;
+        set({ myResolution: resolutionWithPublic });
       } else {
         // 게스트 모드도 Supabase 사용 - 게스트용 임시 데이터는 표시하지 않음
         set({ myResolution: null });
@@ -134,7 +108,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
   saveMyResolution: async (content: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const today = getTodayStringForResolution(); // 오늘 날짜로 저장 (각고는 당일 작성)
+      const tomorrow = getTomorrowKorea(); // D+1 로직: 내일 날짜로 저장
       
       if (!session) {
         throw new Error('게스트 모드에서는 각고를 작성할 수 없습니다.\n회원가입 후 이용해주세요.');
@@ -169,7 +143,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
         .insert([{
           user_id: session.user.id,
           content,
-          date: today,
+          date: tomorrow,
         }])
         .select()
         .single();
@@ -180,7 +154,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
           errorMessage: error.message,
           errorDetails: error.details,
           errorHint: error.hint,
-          targetDate: today,
+          targetDate: tomorrow,
           userId: session.user.id,
           isGuest: !session,
           content: content?.substring(0, 50) + '...'
@@ -197,7 +171,7 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
             .from('daily_resolutions')
             .select('*')
             .eq('user_id', session.user.id)
-            .eq('date', today)
+            .eq('date', tomorrow)
             .single();
           
           if (existingData) {
@@ -214,7 +188,12 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
         throw new Error(`저장 실패: ${error.message || '알 수 없는 오류'}`);
       }
 
-      set({ myResolution: data });
+      // is_public 기본값을 true로 설정하여 저장
+      const resolutionWithPublic = { ...data, is_public: true };
+      set({ myResolution: resolutionWithPublic });
+      
+      // 스마트 동기화 - 커뮤니티 각고 생성 시 즉시 동기화
+      await syncOnUserAction('community_post', { date: tomorrow, contentLength: content.length });
       
       // 커뮤니티 목록 새로고침
       await get().refreshResolutions();
@@ -237,30 +216,27 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
     }
   },
 
-  updateMyResolution: async (content: string) => {
+  toggleMyResolutionPublic: async () => {
     try {
       const { myResolution } = get();
-      if (!myResolution) throw new Error('수정할 각오가 없습니다');
+      if (!myResolution) throw new Error('토글할 각오가 없습니다');
 
-      // 모든 각오 수정은 Supabase에서 처리
-      const { data, error } = await supabase
-        .from('daily_resolutions')
-        .update({ 
-          content,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', myResolution.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      set({ myResolution: data });
+      // DB에 is_public 컬럼이 없으므로 로컬 상태만 토글
+      const newPublicStatus = !myResolution.is_public;
       
-      // 커뮤니티 목록 새로고침
-      await get().refreshResolutions();
+      set({ 
+        myResolution: { 
+          ...myResolution, 
+          is_public: newPublicStatus 
+        } 
+      });
+      
+      console.log(`🔄 각오 공개 상태 토글: ${newPublicStatus ? '공개' : '비공개'}`);
+      
+      // 스마트 동기화 - 공개 상태 변경 시 즉시 동기화
+      await syncOnUserAction('community_privacy', { isPublic: newPublicStatus });
     } catch (error) {
-      console.error('각오 수정 실패:', error);
+      console.error('각오 공개 상태 토글 실패:', error);
       throw error;
     }
   },
@@ -393,6 +369,10 @@ const useCommunityStore = create<CommunityState>((set, get) => ({
       } else {
         set({ resolutions: updatedResolutions });
       }
+      
+      // 스마트 동기화 - 좋아요 토글 시 즉시 동기화
+      const isLiked = !resolution.is_liked_by_current_user;
+      await syncOnUserAction('community_like', { resolutionId, isLiked });
     } catch (error) {
       console.error('좋아요 토글 실패:', error);
       throw error;

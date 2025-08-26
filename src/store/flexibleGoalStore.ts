@@ -86,8 +86,8 @@ export const useFlexibleGoalStore = create<FlexibleGoalState>((set, get) => ({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    // 한국 시간 기준으로 날짜 설정 (tomorrow-first 워크플로우)
-    const targetDate = date || getTomorrowKorea();
+    // 한국 시간 기준으로 날짜 설정 (당일 실행 워크플로우)
+    const targetDate = date || getTodayKorea();
     
     // 해당 날짜에 이미 목표가 있는지 확인
     const existingGoal = get().goals.find(g => g.date === targetDate);

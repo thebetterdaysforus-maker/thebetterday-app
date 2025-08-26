@@ -13,24 +13,16 @@ import {
   PAGINATION_CONFIG
 } from "../utils/performanceUtils";
 // 삭제된 모듈: supabaseNotificationSync
-import {
-  scheduleGoalAlarm,
-  cancelGoalAlarm,
-  scheduleRetrospectReminderImmediate,
-  scheduleRetrospectReminder,
-  cancelRetrospectReminder,
-  getAllScheduledNotifications,
-  cancelAllNotifications,
-  safeNotificationCleanup,
-} from "../helpers/notificationScheduler";
-import { simpleNotificationManager } from "../utils/simpleNotificationManager";
+// 알림 시스템 완전 비활성화됨 (Expo Go SDK 53 제한)
 
-// 모든 알림 취소 함수 (간단 버전)
+// 알림 시스템 완전 비활성화됨
 const cancelAllScheduledAlarms = async () => {
-  console.log('🔕 모든 알림 취소 실행');
+  console.log('🔕 알림 시스템 비활성화됨');
 };
 // 삭제된 모듈: smartNotificationSystem
 import { streakManager, StreakBadge } from "../utils/streakBadgeSystem";
+import { syncOnUserAction } from "../utils/smartSyncManager";
+import { scheduleGoalAlarm, cancelGoalAlarm, scheduleRetrospectReminderImmediate, cancelRetrospectReminder } from "../utils/notificationScheduler";
 
 export interface Goal {
   id: string;
@@ -72,17 +64,28 @@ const canEdit = (g: Goal, isRetrospectDone: boolean) => {
 
   // 목표 편집 가능성 검사 중
 
-  // 🔥 내일 이후 목표: 항상 편집 가능
+  // 🔥 내일 이후 목표: 항상 편집 가능 (회고 완료 여부와 무관)
   if (goalDateKey >= tomorrowKey) {
-    // 내일 이후 목표는 편집 가능
+    console.log("✅ 내일 이후 목표 편집 가능:", {
+      목표제목: g.title,
+      목표날짜: goalDateKey,
+      내일날짜: tomorrowKey,
+      회고완료여부: isRetrospectDone
+    });
     return true;
   }
 
   // 🔥 당일 목표 처리
   if (goalDateKey === todayKey) {
+    console.log("🔍 당일 목표 편집 검사:", {
+      목표제목: g.title,
+      회고완료: isRetrospectDone,
+      당일여부: true
+    });
+    
     // 회고 완료 후에는 편집 불가
     if (isRetrospectDone) {
-      // 회고 완료 후 당일 목표는 편집 불가
+      console.log("❌ 회고 완료 후 당일 목표 편집 불가:", g.title);
       return false;
     }
 
@@ -134,7 +137,7 @@ interface GoalState {
   
   // 알림 디버깅 관련
   checkAllNotifications: () => Promise<void>;
-  cancelAllNotifications: () => Promise<void>;
+  cancelAllNotifications: () => void;
 }
 
 const useGoalStore = create<GoalState>((set, get) => ({
@@ -312,11 +315,14 @@ const useGoalStore = create<GoalState>((set, get) => ({
         console.error("❌ 뱃지 시스템 초기화 실패:", badgeError);
       }
 
-      // 개별 목표 뱃지 복원 (오늘 성공한 목표들을 시간순으로 정렬)
+      // 개별 목표 뱃지 복원 (한국 시간 기준으로 오늘 성공한 목표들을 시간순으로 정렬)
       const finalGoals = get().goals;
-      const todaySuccessGoals = finalGoals?.filter(g => 
-        g.target_time.startsWith(today) && g.status === 'success'
-      ).sort((a, b) => new Date(a.target_time).getTime() - new Date(b.target_time).getTime()) || [];
+      const todaySuccessGoals = finalGoals?.filter(g => {
+        const goalDate = new Date(g.target_time);
+        const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+        const koreanDateKey = koreanDate.toISOString().slice(0, 10);
+        return koreanDateKey === today && g.status === 'success';
+      }).sort((a, b) => new Date(a.target_time).getTime() - new Date(b.target_time).getTime()) || [];
     
     console.log(`🏆 오늘 성공한 목표 ${todaySuccessGoals.length}개의 뱃지 복원 중...`);
     
@@ -329,10 +335,13 @@ const useGoalStore = create<GoalState>((set, get) => ({
     // 연속 승리 카운터 (실시간 계산)
     let consecutiveWins = 0;
     
-      // 오늘의 모든 목표를 시간순으로 정렬
-      const todayAllGoals = finalGoals?.filter(g => 
-        g.target_time.startsWith(today)
-      ).sort((a, b) => new Date(a.target_time).getTime() - new Date(b.target_time).getTime()) || [];
+      // 오늘의 모든 목표를 시간순으로 정렬 (한국 시간 기준)
+      const todayAllGoals = finalGoals?.filter(g => {
+        const goalDate = new Date(g.target_time);
+        const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+        const koreanDateKey = koreanDate.toISOString().slice(0, 10);
+        return koreanDateKey === today;
+      }).sort((a, b) => new Date(a.target_time).getTime() - new Date(b.target_time).getTime()) || [];
     
     // 각 성공한 목표의 연승 레벨 계산 (pending 목표는 제외)
     const completedGoals = todayAllGoals.filter(g => g.status === 'success' || g.status === 'failure');
@@ -357,21 +366,32 @@ const useGoalStore = create<GoalState>((set, get) => ({
     console.log(`📋 오늘 완료된 목표: ${completedGoals.length}개 (성공/실패만), 대기 중: ${todayAllGoals.length - completedGoals.length}개`);
 
     console.log("📊 가져온 목표들:", data?.length || 0, "개");
+    // 날짜별 목표 개수 (한국 시간 기준)
+    const getGoalCountByDate = (targetDate: string) => {
+      return data?.filter((g: Goal) => {
+        const goalDate = new Date(g.target_time);
+        const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+        const koreanDateKey = koreanDate.toISOString().slice(0, 10);
+        return koreanDateKey === targetDate;
+      }).length || 0;
+    };
+
     console.log("📅 날짜별 목표 개수:", {
-      "2년전":
-        data?.filter((g: Goal) => g.target_time.startsWith(twoYearsAgo)).length || 0,
-      오늘: data?.filter((g: Goal) => g.target_time.startsWith(today)).length || 0,
-      "2년후":
-        data?.filter((g: Goal) => g.target_time.startsWith(twoYearsLater)).length ||
-        0,
+      "2년전": getGoalCountByDate(twoYearsAgo),
+      오늘: getGoalCountByDate(today),
+      "2년후": getGoalCountByDate(twoYearsLater),
     });
 
-    // 내일 수행 목록 상세 정보 로그
-    const tomorrowGoals =
-      data?.filter((g: Goal) => g.target_time.startsWith(today)) || [];
+    // 오늘 수행 목표 상세 정보 로그 (한국 시간 기준)
+    const todayGoals = data?.filter((g: Goal) => {
+      const goalDate = new Date(g.target_time);
+      const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+      const koreanDateKey = koreanDate.toISOString().slice(0, 10);
+      return koreanDateKey === today;
+    }) || [];
     console.log(
-      "🔍 오늘 수행 목록 상세 (DB에서 가져온 것):",
-      tomorrowGoals.map((g: Goal) => ({
+      "🔍 오늘 수행 목표 상세 (DB에서 가져온 것):",
+      todayGoals.map((g: Goal) => ({
         title: g.title,
         time: g.target_time,
         status: g.status,
@@ -407,7 +427,7 @@ const useGoalStore = create<GoalState>((set, get) => ({
           if (__DEV__) console.log(`🔕 DB에서 완료/실패 상태인 수행 목록 ${completedGoals.length}개 알림 취소 중...`);
           for (const goal of completedGoals) {
             try {
-              await cancelGoalAlarm(goal.id);
+              // 알림 시스템 비활성화됨
             } catch (error) {
               if (__DEV__) console.log(`⚠️ 수행 목록 "${goal.title}" 알림 취소 실패:`, error);
             }
@@ -576,7 +596,53 @@ const useGoalStore = create<GoalState>((set, get) => ({
           "이미 같은 시간에 목표가 등록되어 있습니다.\n다른 시간을 선택해주세요.",
         );
       }
-      throw error;
+      
+      // 외래키 제약 조건 위반 처리 (프로필이 없는 경우)
+      if (error.code === '23503' && error.message.includes('goals_user_id_fkey')) {
+        console.error("❌ 외래키 제약 조건 위반 - 프로필 누락:", {
+          사용자ID: session.user.id,
+          에러코드: error.code,
+          에러메시지: error.message
+        });
+        
+        // 프로필 재생성 시도
+        try {
+          console.log("🔧 프로필 재생성 시도...");
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: session.user.id,
+              display_name: `게스트${Math.random().toString(36).substr(2, 4)}`,
+              created_at: new Date().toISOString()
+            });
+          
+          if (profileError) {
+            console.error("❌ 프로필 재생성 실패:", profileError);
+            throw new Error("회원 정보 설정에 문제가 있습니다.\n앱을 다시 시작하거나 로그아웃 후 다시 로그인해주세요.");
+          }
+          
+          console.log("✅ 프로필 재생성 완료 - 목표 다시 저장 시도");
+          
+          // 프로필 생성 후 목표 다시 저장
+          const { error: retryError } = await supabase.from("goals").insert([row]);
+          if (retryError) {
+            console.error("❌ 목표 재저장 실패:", retryError);
+            throw new Error("목표 저장에 실패했습니다. 다시 시도해주세요.");
+          }
+          
+          console.log("✅ 프로필 재생성 후 목표 저장 성공");
+        } catch (retryError) {
+          console.error("❌ 프로필 재생성 과정 실패:", retryError);
+          throw new Error("회원 정보 문제로 목표를 저장할 수 없습니다.\n앱을 재시작하거나 로그아웃 후 다시 로그인해주세요.");
+        }
+      } else {
+        console.error("❌ 목표 저장 실패:", {
+          에러코드: error.code,
+          에러메시지: error.message,
+          사용자ID: session.user.id
+        });
+        throw new Error("목표 저장에 실패했습니다. 네트워크 연결을 확인하고 다시 시도해주세요.");
+      }
     }
 
     set((state) => ({
@@ -603,12 +669,10 @@ const useGoalStore = create<GoalState>((set, get) => ({
         한국현재시간: nowKorea.toLocaleString('ko-KR'),
         미래여부: targetKorea > nowKorea
       });
-      await simpleNotificationManager.initialize();
-      await simpleNotificationManager.scheduleGoalNotification(row.id, row.title, targetTime);
+      await scheduleGoalAlarm(row.id, row.title, targetTime);
       
       // 디버깅용 - 알림 스케줄링 후 즉시 확인
-      console.log("🔍 목표 추가 후 알림 확인:");
-      setTimeout(() => simpleNotificationManager.getAllScheduledNotifications(), 2000);
+      console.log("🔍 목표 추가 후 알림 확인 완료");
     } else if (targetKorea <= nowKorea) {
       if (__DEV__) console.log("⏰ 목표 시간이 이미 지나서 알림 설정 안함 (한국시간 기준)");
     } else {
@@ -619,6 +683,9 @@ const useGoalStore = create<GoalState>((set, get) => ({
     console.log("🚫 단일 목표 추가 - 회고 알림 스케줄링 안함");
     
     console.log("⏰ 목표 추가 완료:", row.title, "at", row.target_time);
+    
+    // 스마트 동기화 - 목표 생성 시 즉시 동기화
+    await syncOnUserAction('goal_create', { goalId: row.id, title: row.title });
   },
 
   addGoalsBatch: async (rows: { title: string; target_time: string }[]) => {
@@ -759,7 +826,55 @@ const useGoalStore = create<GoalState>((set, get) => ({
           "이미 같은 시간에 목표가 등록되어 있습니다.\n다른 시간을 선택해주세요.",
         );
       }
-      throw error;
+      
+      // 외래키 제약 조건 위반 처리 (배치 저장 시)
+      if (error.code === '23503' && error.message.includes('goals_user_id_fkey')) {
+        console.error("❌ 배치 저장 시 외래키 제약 조건 위반 - 프로필 누락:", {
+          사용자ID: session.user.id,
+          에러코드: error.code,
+          에러메시지: error.message,
+          목표개수: goals.length
+        });
+        
+        // 프로필 재생성 시도
+        try {
+          console.log("🔧 배치 저장용 프로필 재생성 시도...");
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: session.user.id,
+              display_name: `게스트${Math.random().toString(36).substr(2, 4)}`,
+              created_at: new Date().toISOString()
+            });
+          
+          if (profileError) {
+            console.error("❌ 배치 저장용 프로필 재생성 실패:", profileError);
+            throw new Error("회원 정보 설정에 문제가 있습니다.\n앱을 다시 시작하거나 로그아웃 후 다시 로그인해주세요.");
+          }
+          
+          console.log("✅ 배치 저장용 프로필 재생성 완료 - 목표들 다시 저장 시도");
+          
+          // 프로필 생성 후 목표들 다시 저장
+          const { error: retryError } = await supabase.from("goals").insert(goals);
+          if (retryError) {
+            console.error("❌ 배치 목표 재저장 실패:", retryError);
+            throw new Error("목표 저장에 실패했습니다. 다시 시도해주세요.");
+          }
+          
+          console.log("✅ 프로필 재생성 후 배치 목표 저장 성공");
+        } catch (retryError) {
+          console.error("❌ 배치 저장 프로필 재생성 과정 실패:", retryError);
+          throw new Error("회원 정보 문제로 목표를 저장할 수 없습니다.\n앱을 재시작하거나 로그아웃 후 다시 로그인해주세요.");
+        }
+      } else {
+        console.error("❌ 배치 목표 저장 실패:", {
+          에러코드: error.code,
+          에러메시지: error.message,
+          사용자ID: session.user.id,
+          목표개수: goals.length
+        });
+        throw new Error("목표 저장에 실패했습니다. 네트워크 연결을 확인하고 다시 시도해주세요.");
+      }
     }
 
     set((state) => ({
@@ -791,8 +906,7 @@ const useGoalStore = create<GoalState>((set, get) => ({
           const nowKorea = getKoreaTime();
           
           if (targetTime > nowKorea) {
-            await simpleNotificationManager.initialize();
-            await simpleNotificationManager.scheduleGoalNotification(goal.id, goal.title, targetTime);
+            await scheduleGoalAlarm(goal.id, goal.title, targetTime);
             if (__DEV__) console.log(`✅ 배치 목표 "${goal.title}" 알림 스케줄링 완료`);
           }
         } catch (error) {
@@ -805,6 +919,9 @@ const useGoalStore = create<GoalState>((set, get) => ({
     console.log('🚫 배치 목표 추가 - 회고 알림 스케줄링 안함');
     
     console.log("🔄 배치 목표 추가 완료 - 알림 시스템 활성화됨");
+    
+    // 스마트 동기화 - 배치 목표 생성 시 즉시 동기화
+    await syncOnUserAction('goal_create', { goalCount: goals.length, type: 'batch' });
   },
 
   updateGoal: async (id: string, data: Partial<Goal>) => {
@@ -914,7 +1031,7 @@ const useGoalStore = create<GoalState>((set, get) => ({
 
     // 🔕 목표 수정 시 기존 알림 먼저 취소
     console.log(`🔕 목표 수정으로 알림 취소: ${id}`);
-    await cancelGoalAlarm(id);
+    // 알림 시스템 비활성화됨
 
     set((state) => {
       const newGoals = state.goals
@@ -957,8 +1074,8 @@ const useGoalStore = create<GoalState>((set, get) => ({
           
           if (timeDifferenceMinutes > 10) {
             console.log("🔔 목표 수정으로 알림 재스케줄링 (10분 후 목표만)");
-            await simpleNotificationManager.initialize();
-            await simpleNotificationManager.scheduleGoalNotification(updatedGoal.id, updatedGoal.title, targetTime);
+            await cancelGoalAlarm(id);
+            await scheduleGoalAlarm(id, updatedGoal.title, targetTime);
           } else {
             console.log(`🚫 목표 수정 시 알림 스팸 방지 - 목표까지 ${Math.round(timeDifferenceMinutes)}분 남아서 알림 설정 안함`);
           }
@@ -976,6 +1093,10 @@ const useGoalStore = create<GoalState>((set, get) => ({
     if (data.status) {
       console.log(`🔄 목표 상태 변경 감지: ${id} → ${data.status}`);
     }
+    
+    // 스마트 동기화 - 목표 수정 시 즉시 동기화
+    const actionType = data.status === 'success' || data.status === 'failure' ? 'goal_complete' : 'goal_update';
+    await syncOnUserAction(actionType, { goalId: id, changes: data });
   },
 
   deleteGoal: async (id: string) => {
@@ -1044,6 +1165,7 @@ const useGoalStore = create<GoalState>((set, get) => ({
     }
 
     // 🔕 목표 삭제 시 알림 정리 (Supabase 동기화)
+    await cancelGoalAlarm(id);
 
     set((state) => ({
       goals: state.goals.filter((g) => g.id !== id),
@@ -1202,46 +1324,94 @@ const useGoalStore = create<GoalState>((set, get) => ({
 
   checkGoal: async (id: string) => {
     const goal = get().goals.find((g) => g.id === id);
-    if (!goal) return;
+    if (!goal) {
+      console.error('❌ checkGoal: 목표를 찾을 수 없음:', id);
+      return;
+    }
 
-    // ✅ 목표 완료 시 남은 알림 취소 - 사용자 요청
-    console.log('🔕 목표 완료 - 남은 알림 자동 취소 중...');
-    await simpleNotificationManager.cancelGoalNotifications(id);
+    console.log('🎯 목표 체크 시작:', { id, title: goal.title, status: goal.status });
 
-    // 사용자가 직접 체크하는 경우 = 승리
-    await get().updateGoal(id, { status: "success" });
+    // 알림 취소
+    // 알림 시스템 비활성화됨
+
+    // 🔥 APK 정확한 상태 전환 시스템
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update({ status: 'success' })
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ DB 상태 업데이트 실패:', error);
+        throw error;
+      }
+
+      // 로컬 상태 즉시 업데이트
+      set(state => ({
+        goals: state.goals.map(g => 
+          g.id === id ? { ...g, status: 'success' as const } : g
+        )
+      }));
+
+      console.log('✅ 목표 상태 success로 변경 완료:', id);
+    } catch (error) {
+      console.error('❌ checkGoal 실패:', error);
+      throw error;
+    }
 
     // 승리 연속 뱃지 시스템 업데이트 - 오늘의 카테고리 고정 사용
-    // 현재 연승 상태 확인
+    console.log('🏆 뱃지 생성 시작:', { goalId: id, goalTitle: goal.title });
     
-    // 오늘의 고정된 뱃지 카테고리 가져오기
-    const todayCategory = await streakManager.getTodayBadgeCategory();
-    const currentStreak = streakManager.getTodayStreak();
-    const newStreakLevel = Math.min(currentStreak + 1, 12);
-    
-    // 수동으로 뱃지 생성 (고정된 카테고리 사용)
-    const newBadge = {
-      level: newStreakLevel,
-      category: todayCategory,
-      iconPath: streakManager.getBadgeIconPath(newStreakLevel, todayCategory)
-    };
-    
-    // 메모리에 연승 수 업데이트
-    await streakManager.incrementStreak();
-    
-    // 연승 뱃지 시스템 업데이트 완료
-    set((state) => {
-      const newGoalBadges = new Map(state.goalBadges);
-      newGoalBadges.set(id, newBadge);
-      return { 
-        ...state, 
-        streakBadge: newBadge,
-        goalBadges: newGoalBadges
+    try {
+      // 오늘의 고정된 뱃지 카테고리 가져오기
+      const todayCategory = await streakManager.getTodayBadgeCategory();
+      const currentStreak = streakManager.getTodayStreak();
+      const newStreakLevel = Math.min(currentStreak + 1, 12);
+      
+      console.log('🏆 뱃지 데이터 준비:', {
+        todayCategory,
+        currentStreak,
+        newStreakLevel
+      });
+      
+      // 수동으로 뱃지 생성 (고정된 카테고리 사용)
+      const newBadge = {
+        level: newStreakLevel,
+        category: todayCategory,
+        iconPath: streakManager.getBadgeIconPath(newStreakLevel, todayCategory)
       };
-    });
+      
+      console.log('🏆 생성된 뱃지:', newBadge);
+      
+      // 메모리에 연승 수 업데이트
+      await streakManager.incrementStreak();
+      
+      // 연승 뱃지 시스템 업데이트 완료
+      set((state) => {
+        const newGoalBadges = new Map(state.goalBadges);
+        newGoalBadges.set(id, newBadge);
+        console.log('🏆 뱃지 저장:', {
+          goalId: id,
+          badgeMapSize: newGoalBadges.size,
+          savedBadge: newGoalBadges.get(id)
+        });
+        return { 
+          ...state, 
+          streakBadge: newBadge,
+          goalBadges: newGoalBadges
+        };
+      });
+      
+      console.log('✅ 뱃지 시스템 업데이트 완료:', id);
+    } catch (error) {
+      console.error('❌ 뱃지 생성 실패:', error);
+    }
 
     // 목표 완료 시 알림 처리 (간소화)
     console.log(`✅ 목표 완료 처리: ${id}`);
+
+    // 목표 완료 시 해당 목표의 알림 취소
+    await cancelGoalAlarm(id);
 
     // 마지막 목표 성공 시 회고 알림 관리
     await get().cancelRetrospectIfLastGoalSuccess(id);
@@ -1264,16 +1434,19 @@ const useGoalStore = create<GoalState>((set, get) => ({
       const now = getKoreaTime();
       const timeDiff = now.getTime() - targetTime.getTime();
       const minutesDiff = timeDiff / (1000 * 60);
-      const isToday = goal.target_time.startsWith(today);
+      // 한국 시간 기준으로 오늘인지 확인
+      const goalDate = new Date(goal.target_time);
+      const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+      const koreanDateKey = koreanDate.toISOString().slice(0, 10);
+      const isToday = koreanDateKey === today;
 
-      // 🎯 "완벽보다 시작" 철학: 24시간 성공 윈도우
-      // 오늘 목표: 목표 시간 5분 전부터 체크 가능하고, 24시간 후까지 체크 가능
-      // 내일 목표: 회고 완료 후에는 항상 표시 (체크는 불가능)
+      // 🎯 "완벽보다 시작" 철학: ±5분 확인 창구  
+      // 오늘 날짜의 목표만, 목표 시간 5분 전부터 5분 후까지만 확인 가능
       const canCheck =
         goal.status === "pending" &&
         isToday &&
         minutesDiff >= -5 &&
-        minutesDiff <= 1440; // 24시간 = 1440분
+        minutesDiff <= 5; // ±5분 확인 창구
 
       if (Math.abs(minutesDiff) <= 1440 || Math.abs(minutesDiff) <= 10) {
         // 24시간 이내이거나 10분 이내인 목표 로그
@@ -1283,6 +1456,17 @@ const useGoalStore = create<GoalState>((set, get) => ({
       }
 
       const canEditGoal = canEdit(goal, isRetrospectDone);
+
+      // 디버깅: canEdit 계산 결과 로그
+      if (goal.status === "pending") {
+        console.log(`🔧 canEdit 계산 - ${goal.title}:`, {
+          canEdit: canEditGoal,
+          status: goal.status,
+          targetTime: goal.target_time,
+          isRetrospectDone: isRetrospectDone,
+          goalDateKey: formatDateKorea(new Date(goal.target_time))
+        });
+      }
 
       return { goal, canCheck, canEdit: canEditGoal };
     });
@@ -1320,17 +1504,12 @@ const useGoalStore = create<GoalState>((set, get) => ({
       const minutesDiff = timeDiff / (1000 * 60);
       const hoursDiff = timeDiff / (1000 * 60 * 60);
 
-      // 🎯 "완벽보다 시작" 철학: 24시간 성공 윈도우
-      // 1. 목표 시간으로부터 24시간(1440분) 초과 시에만 실패 처리
-      // 2. 48시간 이상 경과한 목표는 무조건 실패 처리 (이틀 연속 미완료)
-      const isOverdue = minutesDiff > 1440 || hoursDiff > 48;
+      // 🎯 "완벽보다 시작" 철학: ±5분 확인 창구
+      // 목표 시간 5분 후 경과하면 '패배' 처리 (자동 만료)
+      const isOverdue = minutesDiff > 5;
       
       if (isOverdue) {
-        if (hoursDiff > 48) {
-          console.log(`📅 48시간 경과 목표 실패 처리: ${g.title} (${hoursDiff.toFixed(1)}시간 경과)`);
-        } else {
-          console.log(`📅 24시간 경과 목표 실패 처리: ${g.title} (${hoursDiff.toFixed(1)}시간 경과)`);
-        }
+        console.log(`📅 5분 경과 목표 패배 처리: ${g.title} (${minutesDiff.toFixed(1)}분 경과)`);
       }
 
       return isOverdue;
@@ -1389,9 +1568,35 @@ const useGoalStore = create<GoalState>((set, get) => ({
 
   // 마지막 목표 + 30분 후 회고 알림 예약
   scheduleRetrospectForLastGoal: async () => {
-    // 🚫 회고 알림 완전 차단 - 알림 스팸 방지
-    console.log('🚫 회고 알림 시스템 완전 비활성화 (알림 스팸 방지)');
-    return;
+    const settingsString = await AsyncStorage.getItem('notificationSettings');
+    const settings = settingsString ? JSON.parse(settingsString) : { retrospectReminders: true };
+    
+    if (!settings.retrospectReminders) {
+      console.log('🔕 회고 알림이 비활성화되어 있어 스케줄링 건너뜀');
+      return;
+    }
+
+    const goals = get().goals;
+    const today = getTodayKorea();
+    const todayGoals = goals.filter((g) => g.target_time.startsWith(today));
+    
+    if (todayGoals.length === 0) return;
+
+    // 가장 늦은 목표 시간 찾기
+    const lastGoalTime = Math.max(
+      ...todayGoals.map((g) => new Date(g.target_time).getTime())
+    );
+
+    // 마지막 목표 완료 30분 후에 회고 알림 스케줄링
+    const reminderTime = new Date(lastGoalTime + 30 * 60 * 1000);
+    const nowKorea = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    
+    if (reminderTime > nowKorea) {
+      await scheduleRetrospectReminderImmediate();
+      console.log(`📝 회고 알림 예약: ${reminderTime.toLocaleString('ko-KR')}`);
+    } else {
+      console.log('⏰ 회고 알림 시간이 이미 지나서 설정 안함');
+    }
   },
 
   // 마지막 목표 성공 시 회고 알림 취소
@@ -1440,25 +1645,56 @@ const useGoalStore = create<GoalState>((set, get) => ({
 
   // 알림 디버깅 관련
   checkAllNotifications: async () => {
-    console.log("🔍 현재 설정된 알림 확인 시작");
-    try {
-      await simpleNotificationManager.getAllScheduledNotifications();
-      console.log("📊 단순 알림 시스템으로 알림 확인 완료");
-      await getAllScheduledNotifications();
-    } catch (error) {
-      console.log("⚠️ 알림 조회 실패, 기존 시스템 사용:", error);
-      await getAllScheduledNotifications();
-    }
+    console.log("🔕 알림 시스템 비활성화됨");
   },
 
-  cancelAllNotifications: async () => {
-    console.log("🧹 모든 알림 취소 시작");
-    try {
-      await simpleNotificationManager.cancelAllNotifications();
-      console.log("✅ 통합 시스템으로 모든 알림 취소 완료");
-    } catch (error) {
-      console.log("⚠️ 통합 알림 취소 실패, 기존 시스템 사용:", error);
-      await cancelAllNotifications();
+  cancelAllNotifications: () => {
+    console.log("🔕 알림 시스템 비활성화됨");
+  },
+
+  // 이미 완료된 목표들에 대해 뱃지 강제 생성
+  createMissingBadges: async () => {
+    console.log("🏆 누락된 뱃지 생성 시작");
+    
+    const { goals, goalBadges } = get();
+    const successGoals = goals.filter(g => g.status === 'success');
+    
+    console.log("🏆 완료된 목표들:", {
+      전체목표: goals.length,
+      완료목표: successGoals.length,
+      기존뱃지: goalBadges.size
+    });
+    
+    for (const goal of successGoals) {
+      if (!goalBadges.has(goal.id)) {
+        console.log("🏆 뱃지 생성:", goal.title);
+        
+        try {
+          const todayCategory = await streakManager.getTodayBadgeCategory();
+          const currentStreak = streakManager.getTodayStreak();
+          const newStreakLevel = Math.min(currentStreak + 1, 12);
+          
+          const newBadge = {
+            level: newStreakLevel,
+            category: todayCategory,
+            iconPath: streakManager.getBadgeIconPath(newStreakLevel, todayCategory)
+          };
+          
+          set((state) => {
+            const newGoalBadges = new Map(state.goalBadges);
+            newGoalBadges.set(goal.id, newBadge);
+            return { 
+              ...state, 
+              goalBadges: newGoalBadges
+            };
+          });
+          
+          await streakManager.incrementStreak();
+          console.log("✅ 뱃지 생성 완료:", goal.title);
+        } catch (error) {
+          console.error("❌ 뱃지 생성 실패:", error);
+        }
+      }
     }
   },
 

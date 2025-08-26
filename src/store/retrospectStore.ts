@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { supabase } from '../supabaseClient';
 import { getTodayKorea } from '../utils/timeUtils';
+import { syncOnUserAction } from '../utils/smartSyncManager';
+import { cancelRetrospectReminder } from '../utils/notificationScheduler';
 
 export interface Retrospect {
   user_id: string;
@@ -29,11 +31,18 @@ const useRetrospectStore = create<RetrospectState>((set, get) => ({
   todayRetrospectExists: false,
 
   fetchToday: async () => {
-    // 한국 시간 기준으로 오늘 날짜 계산
-    const today = getTodayKorea();
-    if (__DEV__) console.log('🔍 회고 조회 시작:', { today });
+    // 🔥 APK 안전한 한국 시간 회고 조회
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const koreaTime = new Date(utc + (9 * 60 * 60 * 1000));
+    const today = koreaTime.toISOString().slice(0, 10);
+    
+    if (__DEV__) console.log('🔍 회고 조회 (APK 한국시간):', { 
+      today,
+      koreaTime: koreaTime.toLocaleString('ko-KR')
+    });
+    
     const retrospect = await get().fetchOne(today);
-    if (__DEV__) console.log('🔍 회고 조회 결과:', { retrospect, exists: !!retrospect });
     set({ todayRetrospectExists: !!retrospect });
   },
 
@@ -72,10 +81,26 @@ const useRetrospectStore = create<RetrospectState>((set, get) => ({
   },
 
   saveRetrospect: async (text: string) => {
-    // 한국 시간 기준으로 오늘 날짜 계산
-    const today = getTodayKorea();
+    // 🔥 APK 안전한 한국 시간 회고 저장
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const koreaTime = new Date(utc + (9 * 60 * 60 * 1000));
+    const today = koreaTime.toISOString().slice(0, 10);
+    
+    console.log('💾 회고 저장 (APK 한국시간):', { 
+      today,
+      text: text.slice(0, 50) + '...'
+    });
+    
     await get()._upsert(today, text);
     set({ todayRetrospectExists: true });
+    
+    // 회고록 작성 완료 시 회고 알림 취소
+    await cancelRetrospectReminder();
+    console.log('📝 회고록 작성 완료 - 회고 알림 취소됨');
+    
+    // 스마트 동기화 - 회고 생성/수정 시 즉시 동기화
+    await syncOnUserAction('retrospect_create', { date: today, textLength: text.length });
   },
 
   _upsert: async (date: string, text: string) => {

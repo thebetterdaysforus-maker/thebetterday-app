@@ -14,6 +14,8 @@ interface ProfileState {
   fetchProfile: () => Promise<boolean>;
   saveProfile: (display_name: string, dream: string, referrer?: string) => Promise<void>;
   updateDream: (dream: string) => Promise<void>;
+  // 게스트용 자동 프로필 생성
+  createAutoGuestProfile: () => Promise<boolean>;
 }
 
 const useProfileStore = create<ProfileState>((set) => ({
@@ -111,6 +113,47 @@ const useProfileStore = create<ProfileState>((set) => ({
     } catch (error) {
       console.error('꿈 저장 실패:', error);
       throw error;
+    }
+  },
+
+  // 게스트용 자동 프로필 생성
+  createAutoGuestProfile: async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.is_anonymous) {
+        console.log('❌ 게스트 세션이 아님');
+        return false;
+      }
+
+      // 랜덤 번호로 자동 닉네임 생성
+      const randomNum = Math.floor(Math.random() * 9999) + 1;
+      const autoDisplayName = `게스트${randomNum}`;
+      const autoDream = "더 나은 내일을 위해";
+
+      console.log('🤖 자동 게스트 프로필 생성:', { autoDisplayName });
+
+      const profile = {
+        id: session.user.id,
+        display_name: autoDisplayName,
+        dream: autoDream,
+        created_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .upsert([profile]);
+
+      if (error) {
+        console.error('❌ 자동 프로필 생성 실패:', error.message);
+        return false;
+      }
+
+      set({ profile });
+      console.log('✅ 자동 게스트 프로필 생성 완료');
+      return true;
+    } catch (error) {
+      console.error('❌ 자동 프로필 생성 오류:', error);
+      return false;
     }
   },
 }));
