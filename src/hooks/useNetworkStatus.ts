@@ -30,8 +30,8 @@ export const useNetworkStatus = () => {
     // 초기 체크
     checkStatus();
     
-    // 30초마다 체크
-    intervalId = setInterval(checkStatus, 30000);
+    // 5초마다 체크 (앱 시작 시 빠른 동기화)
+    intervalId = setInterval(checkStatus, 5000);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
