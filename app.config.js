@@ -36,7 +36,20 @@ export default ({ config }) => ({
     versionCode: 9,
     // APK 실행 안정성을 위한 추가 설정
     allowBackup: true,
-    usesCleartextTraffic: true // HTTP 연결 허용 (개발용)
+    usesCleartextTraffic: true, // HTTP 연결 허용 (개발용)
+    // Google OAuth를 위한 스키마 설정
+    intentFilters: [
+      {
+        action: "VIEW",
+        autoVerify: true,
+        category: ["BROWSABLE", "DEFAULT"],
+        data: [
+          {
+            scheme: "com.thebetterday.app"
+          }
+        ]
+      }
+    ]
   },
   extra: {
     EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
