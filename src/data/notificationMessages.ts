@@ -1,6 +1,7 @@
 // 알림 메시지 데이터 (자체 코드 DB)
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../supabaseClient';
+
 export interface NotificationMessage {
   id: number;
   type: "general" | "goal";
@@ -370,7 +371,7 @@ export const getRandomNotificationMessage = async (goalTitle?: string) => {
   const randomMessage = filteredMessages[Math.floor(Math.random() * filteredMessages.length)];
   
   if (!randomMessage) {
-    return "목표 달성 시간입니다!";
+    return "더 나은 하루를 위해!";
   }
 
   let finalMessage = randomMessage.message;
