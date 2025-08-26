@@ -9,7 +9,18 @@ const Stack = createNativeStackNavigator();
 
 export default function HistoryStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#fff',
+        },
+        headerShadowVisible: false,
+        headerTitleStyle: {
+          fontSize: 18,
+          fontWeight: '600',
+        },
+      }}
+    >
       <Stack.Screen 
         name="HistoryCalendar" 
         component={HistoryCalendarScreen}

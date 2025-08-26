@@ -11,7 +11,18 @@ const Stack = createNativeStackNavigator();
 
 export default function HomeStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#fff',
+        },
+        headerShadowVisible: false,
+        headerTitleStyle: {
+          fontSize: 18,
+          fontWeight: '600',
+        },
+      }}
+    >
       <Stack.Screen
         name="GoalList"
         component={GoalListScreen}
@@ -35,7 +46,7 @@ export default function HomeStack() {
       <Stack.Screen
         name="FlexibleGoal"
         component={FlexibleGoalScreen}
-        options={{ title: "필수 목표" }}
+        options={{ title: "자유 목표" }}
       />
       <Stack.Screen
         name="Retrospect"
