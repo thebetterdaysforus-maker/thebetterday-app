@@ -1335,8 +1335,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
 
         {/* 수정 + 상태 */}
         <View style={styles.actions}>
-          {/* 임시: 모든 pending 목표에 수정 버튼 표시 (디버깅용) */}
-          {(item.canEdit || item.goal.status === "pending") && (
+          {item.canEdit && (
             <>
               <TouchableOpacity
                 style={styles.editButton}

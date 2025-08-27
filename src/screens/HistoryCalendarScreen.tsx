@@ -65,8 +65,14 @@ export default function HistoryCalendarScreen() {
   // useEffect도 항상 동일한 순서로 호출
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { 
+          console.log('❌ 달력 사용자 인증 실패');
+          setLoading(false); 
+          return; 
+        }
+        console.log('✅ 달력 사용자 인증 성공');
 
       /* ① 정시 목표 가져오기 */
       const { data: goalsRaw, error: e1 } = await supabase
@@ -174,8 +180,14 @@ export default function HistoryCalendarScreen() {
         }))
       });
 
-      setMeta(m);
-      setLoading(false);
+        setMeta(m);
+        setLoading(false);
+      } catch (error) {
+        console.error('❌ 달력 데이터 로딩 실패:', error);
+        setLoading(false);
+        // 에러 발생 시에도 빈 상태로 화면 표시
+        setMeta({});
+      }
     })();
   }, []);
 

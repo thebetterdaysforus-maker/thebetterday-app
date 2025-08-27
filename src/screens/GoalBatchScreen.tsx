@@ -381,8 +381,17 @@ export default function GoalBatchScreen({ route }: any) {
   /* ──────────────── UI ──────────────── */
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F0F0F0" />
-      <View style={{ paddingTop: Math.max(insets.top, 44) }} />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
+      {/* 커스텀 헤더 */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.backButtonText}>← 뒤로</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>수행 목표 추가</Text>
+      </View>
+
+      <View style={styles.content}>
       <FlatList
         ref={scrollViewRef}
         data={tempGoals}
@@ -518,6 +527,7 @@ export default function GoalBatchScreen({ route }: any) {
           </TouchableOpacity>
         </View>
       )}
+      </View>
 
       {/* 시간 선택 모달 */}
       <Modal
@@ -571,7 +581,42 @@ export default function GoalBatchScreen({ route }: any) {
 
 /* ──────────────── 스타일 ──────────────── */
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    backgroundColor: "#ffffff",
+    position: "relative",
+  },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#000000",
+    textAlign: "center",
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",

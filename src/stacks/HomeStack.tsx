@@ -31,12 +31,12 @@ export default function HomeStack() {
       <Stack.Screen
         name="GoalDetail"
         component={GoalDetailScreen}
-        options={{ title: "수행 목록 상세" }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="GoalBatch"
         component={GoalBatchScreen}
-        options={{ title: "수행 목록 설정" }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="TimeSelect"
@@ -46,12 +46,12 @@ export default function HomeStack() {
       <Stack.Screen
         name="FlexibleGoal"
         component={FlexibleGoalScreen}
-        options={{ title: "자유 목표" }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="Retrospect"
         component={RetrospectScreen}
-        options={{ title: "회고 작성" }}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

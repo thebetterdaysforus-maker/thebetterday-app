@@ -216,17 +216,18 @@ export default function GoalDetailScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#fff" }}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 44) }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={{ paddingTop: Math.max(insets.top, 44) }} />
-      <View style={styles.container}>
-        <Text style={styles.headerText}>
-          {existing
-            ? "수행 목록 수정"
-            : batch
-              ? "수행 목록 작성"
-              : "수행 목록 추가"}
-        </Text>
+      
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Text style={styles.backButtonText}>← 뒤로</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>수행 목록</Text>
+      </View>
+
+      <View style={styles.content}>
 
         {/* 선택된 시간 */}
         <Text style={styles.timeText}>
@@ -319,6 +320,38 @@ export default function GoalDetailScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    backgroundColor: "#ffffff",
+    position: "relative",
+  },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#000000",
+    textAlign: "center",
+  },
+  content: {
     flex: 1,
     padding: 20,
     paddingTop: 24,

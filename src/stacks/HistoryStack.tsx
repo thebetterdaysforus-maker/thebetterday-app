@@ -29,17 +29,17 @@ export default function HistoryStack() {
       <Stack.Screen 
         name="DayDetail" 
         component={DayDetailScreen}
-        options={{ title: '일별 상세' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="Retrospect" 
         component={RetrospectScreen}
-        options={{ title: '회고 작성' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="Statistics" 
         component={PersonalAnalyticsScreen}
-        options={{ title: '성장 분석' }}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
