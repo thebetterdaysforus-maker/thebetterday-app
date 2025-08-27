@@ -2,8 +2,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState, useRef, ErrorInfo } from 'react';
 import { View, Text, StyleSheet, Alert, TextInput, Platform, Image, SafeAreaView, TouchableOpacity } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
+// Expo 알림 시스템 비활성화됨
 import * as Font from 'expo-font';
 import {
   NotoSansKR_400Regular,
@@ -17,7 +18,8 @@ import useUserStore from './src/store/userStore';
 import useProfileStore from './src/store/profileStore';
 import { useAuthStore } from './src/store/authStore';
 import useGoalStore from './src/store/goalStore';
-import { getCurrentTimeZone } from './src/utils/timeUtils';
+import { getCurrentTime } from './src/utils/timeUtils';
+import { smartSyncManager } from './src/utils/smartSyncManager';
 
 // APK 실행 오류 방지를 위한 Error Boundary Component
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
@@ -69,12 +71,35 @@ function MainApp() {
   const [loading, setLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
   const [supabaseStatus, setSupabaseStatus] = useState<{
     isConnected: boolean;
     canAuth: boolean;
     canRead: boolean;
   }>({ isConnected: false, canAuth: false, canRead: false });
   const navigationRef = useRef<any>(null);
+
+  // 첫 실행 여부 확인
+  useEffect(() => {
+    const checkFirstLaunch = async () => {
+      try {
+        const hasLaunchedBefore = await AsyncStorage.getItem('hasLaunchedBefore');
+        if (!hasLaunchedBefore) {
+          console.log('🆕 첫 실행 감지 - Welcome 화면으로 이동');
+          setIsFirstLaunch(true);
+          await AsyncStorage.setItem('hasLaunchedBefore', 'true');
+        } else {
+          console.log('🔄 재실행 감지 - 기존 세션 복원 가능');
+          setIsFirstLaunch(false);
+        }
+      } catch (error) {
+        console.log('⚠️ 첫 실행 확인 실패:', error);
+        setIsFirstLaunch(false);
+      }
+    };
+    
+    checkFirstLaunch();
+  }, []);
 
   // 전역 함수 등록 (개발 환경에서만)
   useEffect(() => {
@@ -108,9 +133,34 @@ function MainApp() {
         
         try {
           // dynamic import 제거하고 일반 import 사용
-          console.log('🧹 알림 삭제 기능은 개발 중입니다.');
+          const Notifications = require('expo-notifications');
+          await Notifications.cancelAllScheduledNotificationsAsync();
+          console.log('✅ 모든 스케줄된 알림 삭제 완료');
         } catch (error) {
           console.error('❌ 알림 삭제 실패:', error);
+        }
+      };
+      
+      // 첫 실행 플래그 초기화 함수 (개발용)
+      const resetFirstLaunchFlag = async () => {
+        console.log('🔄 첫 실행 플래그 초기화 시작');
+        try {
+          await AsyncStorage.removeItem('hasLaunchedBefore');
+          await supabase.auth.signOut();
+          console.log('✅ 첫 실행 플래그 및 세션 초기화 완료');
+          console.log('💡 앱을 다시 로드하면 Welcome 화면이 표시됩니다');
+        } catch (error) {
+          console.error('❌ 초기화 실패:', error);
+        }
+      };
+
+      // 뱃지 디버깅 함수
+      const createMissingBadges = async () => {
+        console.log('🏆 누락된 뱃지 생성 함수 호출');
+        try {
+          await (goalStoreState as any).createMissingBadges();
+        } catch (error) {
+          console.error('❌ 뱃지 생성 실패:', error);
         }
       };
       
@@ -119,15 +169,21 @@ function MainApp() {
         if (typeof window !== 'undefined') {
           (window as any).checkNotifications = checkNotifications;
           (window as any).clearAllNotifications = clearAllNotifications;
+          (window as any).createMissingBadges = createMissingBadges;
+          (window as any).resetFirstLaunchFlag = resetFirstLaunchFlag;
         } else if (typeof global !== 'undefined') {
           (global as any).checkNotifications = checkNotifications;
           (global as any).clearAllNotifications = clearAllNotifications;
+          (global as any).createMissingBadges = createMissingBadges;
+          (global as any).resetFirstLaunchFlag = resetFirstLaunchFlag;
         }
         
         console.log('🔧 디버깅용 함수 등록 완료');
         console.log('💡 사용 가능한 함수:');
         console.log('  - checkNotifications() : 예약된 알림 확인');
         console.log('  - clearAllNotifications() : 모든 알림 삭제');
+        console.log('  - createMissingBadges() : 완료된 목표의 뱃지 생성');
+        console.log('  - resetFirstLaunchFlag() : 첫 실행 플래그 초기화 (Welcome 화면 테스트용)');
       } catch (e) {
         console.log('전역 함수 등록 건너뜀 (정상)');
       }
@@ -186,17 +242,12 @@ function MainApp() {
           console.warn('⚠️ 기본 네트워크 연결 실패 감지');
         }
         
-        // 알림 시스템 정상 작동 - 목표 알림과 회고 알림 활성화 (APK 안전 처리)
-        try {
-          if (__DEV__) console.log("🔔 알림 시스템 정상 작동 중");
-        } catch (notificationError) {
-          APKErrorReporter.report(notificationError, 'notification_system');
-          console.log('⚠️ 알림 시스템 건너뜀:', notificationError);
-        }
+        // 알림 시스템 비활성화 (Expo Go SDK 53 제한)
+        if (__DEV__) console.log("🔕 알림 시스템 비활성화됨 (SDK 53 제한)");
         
         // 시간대 설정 초기화 (APK 안전 처리)
         try {
-          await getCurrentTimeZone();
+          const currentTime = getCurrentTime();
         } catch (timezoneError) {
           APKErrorReporter.report(timezoneError, 'timezone_setup');
           console.log('⚠️ 타임존 설정 건너뜀:', timezoneError);
@@ -232,17 +283,83 @@ function MainApp() {
           if (__DEV__) console.log('🔍 현재 세션 상태:', session ? '있음' : '없음');
           
           if (session) {
-            // 기존 세션이 있으면 자동 로그인 활성화
-            if (__DEV__) console.log('✅ 기존 세션 발견 - 자동 로그인 활성화');
+            // 세션 유효성 검증 - Authentication과 Profile 데이터 일치 확인
+            if (__DEV__) console.log('✅ 기존 세션 발견 - 유효성 검증 중...');
+            
             try {
+              // Authentication 사용자 정보와 Profile 테이블 데이터 일치 여부 확인
+              const { data: authUser, error: authError } = await supabase.auth.getUser();
+              
+              if (authError || !authUser.user) {
+                console.log('❌ Authentication 사용자 정보 없음 - 세션 정리');
+                // 유효하지 않은 세션이므로 정리
+                await supabase.auth.signOut();
+                setSession(null);
+                // Profile 데이터도 정리
+                await AsyncStorage.removeItem('hasLaunchedBefore');
+                setIsFirstLaunch(true);
+                setLoading(false);
+                return;
+              }
+              
+              // Profile 테이블에서 해당 사용자 확인 (게스트 모드는 예외)
+              if (!authUser.user.is_anonymous) {
+                // 정식 회원만 Profile 테이블 검증
+                const { data: profile, error: profileError } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', authUser.user.id)
+                  .single();
+                
+                if (profileError || !profile) {
+                  console.log('❌ Profile 데이터 없음 또는 불일치 - 정리 후 재시작');
+                  // Authentication에는 있지만 Profile에 없는 경우 - 세션 정리
+                  await supabase.auth.signOut();
+                  setSession(null);
+                  await AsyncStorage.removeItem('hasLaunchedBefore');
+                  setIsFirstLaunch(true);
+                  setLoading(false);
+                  return;
+                }
+              } else {
+                // 게스트 모드 - AsyncStorage에서 프로필 복원 시도
+                console.log('🎭 게스트 모드 - 로컬 프로필 복원 시도');
+                try {
+                  await fetchProfile(); // Profile Store에서 게스트 프로필 로드
+                  console.log('✅ 게스트 프로필 복원 완료');
+                } catch (guestProfileError) {
+                  console.log('⚠️ 게스트 프로필 없음 - 프로필 설정 필요');
+                }
+              }
+              
+              console.log('✅ 세션 유효성 검증 완료 - 자동 로그인 활성화');
               await enableAutoLogin();
-            } catch (autoLoginError) {
-              console.log('⚠️ 자동 로그인 설정 건너뜀:', autoLoginError);
+            } catch (validationError) {
+              console.error('❌ 세션 검증 실패:', validationError);
+              // 검증 실패 시 안전하게 초기화
+              await supabase.auth.signOut();
+              setSession(null);
+              await AsyncStorage.removeItem('hasLaunchedBefore');
+              setIsFirstLaunch(true);
+              setLoading(false);
+              return;
             }
+            
             setSession(session);
             
-            // 로그인 후 지연된 회고 알림 보정 실행
-            console.log('🔍 지연된 회고 알림 보정 체크 시작...');
+            // 스마트 동기화 시스템 초기화
+            console.log('🚀 스마트 동기화 시스템 활성화');
+            // smartSyncManager는 자동으로 앱 상태 변화를 감지하여 동기화 관리
+            
+            // 로그인 후 즉시 동기화 실행
+            console.log('🔄 앱 시작 시 즉시 동기화 시작...');
+            try {
+              const { offlineDataManager } = await import('./src/utils/offlineDataManager');
+              await offlineDataManager.syncWhenOnline(supabase);
+              console.log('✅ 앱 시작 동기화 완료');
+            } catch (syncError) {
+              console.log('⚠️ 앱 시작 동기화 건너뜀:', syncError);
+            }
             console.log('✅ 자동 로그인 성공');
           } else {
             // 세션이 없으면 로그인 화면으로
@@ -267,29 +384,59 @@ function MainApp() {
     // 즉시 인증 초기화
     initializeAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Listen for auth changes + 실시간 구독 관리
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       
-      // 로그인 성공 시 자동 로그인 활성화
+      console.log('🔄 인증 상태 변경:', event, session ? '로그인' : '로그아웃');
+      
       if (session) {
+        // 로그인 시
         await enableAutoLogin();
+        
+        // 🔴 실시간 구독 시작
+        const { realtimeManager } = await import('./src/utils/realtimeManager');
+        await realtimeManager.startRealtimeSubscriptions(session.user.id);
+        
+      } else {
+        // 로그아웃 시 실시간 구독 중지
+        const { realtimeManager } = await import('./src/utils/realtimeManager');
+        await realtimeManager.stopRealtimeSubscriptions();
       }
     });
 
     return () => subscription.unsubscribe();
   }, [setSession, performAutoLogin, enableAutoLogin]);
 
+  // 🔄 통합 데이터 관리 시스템 적용 (게스트는 수동 프로필 설정 필수)
   useEffect(() => {
-    if (session) {
-      fetchProfile().catch(console.error);
+    if (session && !session.user.is_anonymous) {
+      // 일반 로그인 사용자만 자동 동기화
+      import('./src/store/masterDataManager').then(({ masterDataManager }) => {
+        masterDataManager.syncAllData()
+          .then((success) => {
+            if (success) {
+              console.log('✅ 앱 시작 데이터 동기화 완료');
+              // 프로필 상태 강제 새로고침
+              fetchProfile();
+            } else {
+              console.log('⚠️ 일부 데이터 동기화 실패');
+            }
+          })
+          .catch(console.error);
+      });
+    } else if (session?.user.is_anonymous) {
+      // 게스트 모드는 수동 프로필 설정 필수
+      console.log('🎭 게스트 모드 - 수동 프로필 설정 대기');
     }
   }, [session, fetchProfile]);
 
+
+
   // 스플래시 스크린 비활성화됨
 
-  // 로딩 화면
-  if (loading || !fontsLoaded) {
+  // 로딩 화면 (첫 실행 확인 포함)
+  if (loading || !fontsLoaded || isFirstLaunch === null) {
     return (
       <View style={styles.loadingContainer}>
         <View style={styles.logoContainer}>
@@ -301,7 +448,7 @@ function MainApp() {
           <Text style={styles.loadingText}>The Better Day</Text>
         </View>
         <Text style={styles.loadingSubtext}>
-          {!fontsLoaded ? '폰트 로딩 중...' : '로딩 중...'}
+          {!fontsLoaded ? '폰트 로딩 중...' : supabaseStatus.isConnected ? '동기화 중...' : '서버 연결 중...'}
         </Text>
       </View>
     );
@@ -353,22 +500,25 @@ function MainApp() {
       session: session ? '있음' : '없음',
       profile: profile ? '있음' : '없음',
       isAnonymous: session?.user?.is_anonymous || false,
-      userId: session?.user?.id?.slice(0, 8) || 'N/A'
+      userId: session?.user?.id?.slice(0, 8) || 'N/A',
+      isFirstLaunch
     });
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <StatusBar style="auto" />
-      
-      {!session ? (
-        <AuthStack />
-      ) : !profile ? (
-        <AuthStack />
-      ) : (
-        <MainTab />
-      )}
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer ref={navigationRef}>
+        <StatusBar style="auto" />
+        
+        {!session ? (
+          <AuthStack />
+        ) : !profile ? (
+          <ProfileSetupScreen />
+        ) : (
+          <MainTab />
+        )}
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 
