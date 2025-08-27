@@ -145,7 +145,7 @@ const CommunityScreen = () => {
           <View style={styles.guestModeCard}>
             <Ionicons name="lock-closed-outline" size={24} color="#999" />
             <Text style={styles.guestModeText}>
-              게스트 모드에서는 각오 공유가 제한됩니다
+              게스트 모드에서는 다짐/응원의 말 공유가 제한됩니다
             </Text>
             <Text style={styles.guestModeSubText}>
               회원가입하고 커뮤니티에 참여해보세요!
@@ -155,16 +155,16 @@ const CommunityScreen = () => {
           <View style={styles.noResolutionCard}>
             <Ionicons name="chatbubble-outline" size={24} color="#999" />
             <Text style={styles.noResolutionText}>
-              등록 각오/다짐 문이 없어 네트워킹에 공유되지 않았습니다.
+              등록 다짐/응원의 말 문이 없어 네트워킹에 공유되지 않았습니다.
             </Text>
             <Text style={styles.noResolutionSubText}>
-              네트워킹에는 전날 각오/다짐만 표시됩니다!
+              네트워킹에는 전날 다짐/응원의 말만 표시됩니다!
             </Text>
           </View>
         ) : (
           <View style={styles.myResolutionCompactCard}>
             <View style={styles.compactHeader}>
-              <Text style={styles.compactLabel}>내 각오/다짐</Text>
+              <Text style={styles.compactLabel}>내 다짐/응원</Text>
               <Text style={styles.compactSeparator}>:</Text>
               <Text style={styles.compactContent} numberOfLines={1}>
                 {myResolution.content}
@@ -260,9 +260,9 @@ const CommunityScreen = () => {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>아직 등록된 각오가 없어요</Text>
+            <Text style={styles.emptyText}>아직 등록된 다짐/응원이 없어요</Text>
             <Text style={styles.emptySubText}>
-              첫 번째 각오를 작성해보세요!
+              첫 번째 다짐/응원을 작성해보세요!
             </Text>
           </View>
         }
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     borderColor: "#e9ecef",
   },
   noResolutionText: {
-    fontSize: 12,
+    fontSize: 10,
     color: "#666",
     marginTop: 8,
     fontWeight: "500",

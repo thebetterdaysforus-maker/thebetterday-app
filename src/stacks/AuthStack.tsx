@@ -51,7 +51,7 @@ export default function AuthStack() {
       <Stack.Screen 
         name="ProfileSetup" 
         component={ProfileSetupScreen} 
-        options={{ title: '프로필 설정', headerBackVisible: false }} 
+        options={{ headerShown: false }} 
       />
     </Stack.Navigator>
   );

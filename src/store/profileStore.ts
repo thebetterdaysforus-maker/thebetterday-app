@@ -16,6 +16,8 @@ interface ProfileState {
   updateDream: (dream: string) => Promise<void>;
   // 게스트용 자동 프로필 생성
   createAutoGuestProfile: () => Promise<boolean>;
+  // 프로필 상태 초기화
+  clearProfile: () => void;
 }
 
 const useProfileStore = create<ProfileState>((set) => ({
@@ -155,6 +157,12 @@ const useProfileStore = create<ProfileState>((set) => ({
       console.error('❌ 자동 프로필 생성 오류:', error);
       return false;
     }
+  },
+
+  // 프로필 상태 완전 초기화
+  clearProfile: () => {
+    set({ profile: null });
+    console.log('🧹 프로필 상태 초기화 완료');
   },
 }));
 

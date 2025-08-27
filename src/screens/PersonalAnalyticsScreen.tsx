@@ -8,12 +8,14 @@ import {
   RefreshControl,
   StatusBar,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAnalyticsStore } from "../store/analyticsStore";
 import { useMotivationMessageStore } from "../store/motivationMessageStore";
 
 const PersonalAnalyticsScreen: React.FC = () => {
   console.log("🚨🚨🚨 PersonalAnalyticsScreen 컴포넌트 렌더링됨!!!");
+  const navigation = useNavigation();
   const {
     statistics,
     hourlyStats,
@@ -87,11 +89,22 @@ const PersonalAnalyticsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-      <View style={{ paddingTop: insets.top }} />
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 44) }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Text style={styles.backButtonText}>← 뒤로</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>데이터 분석</Text>
+      </View>
+
       <ScrollView
-        style={styles.container}
+        style={styles.scrollContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -254,7 +267,40 @@ const PersonalAnalyticsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#ffffff",
+    paddingTop: 44, // SafeArea 고려
+  },
+  scrollContainer: {
+    flex: 1,
     backgroundColor: "#f5f5f5",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    backgroundColor: "#ffffff",
+    position: "relative",
+  },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#000000",
+    textAlign: "center",
   },
   loadingContainer: {
     flex: 1,

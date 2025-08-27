@@ -380,12 +380,12 @@ export default function GoalBatchScreen({ route }: any) {
 
   /* ──────────────── UI ──────────────── */
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 44) }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
-      {/* 커스텀 헤더 */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>← 뒤로</Text>
         </TouchableOpacity>
         <Text style={styles.title}>수행 목표 추가</Text>
@@ -584,6 +584,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#ffffff",
+    paddingTop: 44, // SafeArea 고려
   },
   header: {
     flexDirection: "row",

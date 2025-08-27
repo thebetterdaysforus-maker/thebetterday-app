@@ -9,11 +9,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  StatusBar,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import useProfileStore from "../store/profileStore";
+import useUserStore from "../store/userStore";
 import { supabase } from "../supabaseClient";
 
 /** 약관 항목 정의 */
@@ -60,10 +62,10 @@ const REFERRER_OPTIONS = [
   { id: "other", text: "그 외", subtext: "", value: "other" },
 ];
 
-export default function ProfileSetupScreen({ route }: any) {
-  // useNavigation hook 사용
-  const navigation = useNavigation() as any;
-  const { saveProfile } = useProfileStore();
+export default function ProfileSetupScreen({ route, navigation }: any) {
+  const insets = useSafeAreaInsets();
+  const { saveProfile, clearProfile } = useProfileStore();
+  const { setSession } = useUserStore();
 
   // 온보딩 데이터 받아오기
   const onboardingData = route?.params?.onboardingData;
@@ -281,15 +283,22 @@ export default function ProfileSetupScreen({ route }: any) {
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: "#ffffff" }}
-      contentContainerStyle={{
-        padding: 24,
-        paddingBottom: 40,
-        backgroundColor: "#ffffff",
-      }}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 44) }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <Text style={styles.title}>프로필 설정</Text>
+      </View>
+
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={{
+          padding: 24,
+          paddingBottom: 40,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
       {/* 헤드라인 */}
       <Text style={styles.head1}>
         지금 바로 시작하기 위해{"\n"}
@@ -398,11 +407,49 @@ export default function ProfileSetupScreen({ route }: any) {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </View>
   );
 }
 
 /* ────────────── 스타일 ────────────── */
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    paddingTop: 44, // SafeArea 고려
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    backgroundColor: "#ffffff",
+    position: "relative",
+  },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#000000",
+    textAlign: "center",
+  },
+  scrollContainer: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+  },
   head1: { fontSize: 18, color: "#888", marginBottom: 4 },
   head2: { fontSize: 18, color: "#0066ff", fontWeight: "bold" },
 

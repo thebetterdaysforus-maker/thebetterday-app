@@ -7,7 +7,9 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
+  StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "../store/authStore";
 
 interface GuestModeScreenProps {
@@ -15,6 +17,7 @@ interface GuestModeScreenProps {
 }
 
 export default function GuestModeScreen({ navigation }: GuestModeScreenProps) {
+  const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(false);
   const { signInAsGuest } = useAuthStore();
 
@@ -48,15 +51,14 @@ export default function GuestModeScreen({ navigation }: GuestModeScreenProps) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 44) }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
+      {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>← 뒤로</Text>
         </TouchableOpacity>
-
         <Text style={styles.title}>비회원 체험</Text>
       </View>
 
@@ -110,39 +112,50 @@ export default function GuestModeScreen({ navigation }: GuestModeScreenProps) {
           <Text style={styles.secondaryButtonText}>회원가입하고 시작하기</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#ffffff",
+    paddingTop: 44, // SafeArea 고려
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 10,
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    backgroundColor: "#ffffff",
+    position: "relative",
   },
   backButton: {
-    marginRight: 20,
+    position: "absolute",
+    left: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   backButtonText: {
     fontSize: 16,
-    color: "#667eea",
+    color: "#007AFF",
+    fontWeight: "500",
   },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#2c3e50",
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#000000",
+    textAlign: "center",
   },
   content: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
+    backgroundColor: "#f8f9fa",
   },
   iconContainer: {
     width: 100,

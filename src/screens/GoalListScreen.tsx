@@ -180,7 +180,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
           .single();
 
         if (error && error.code !== 'PGRST116') {
-          console.error(`${date} 각오 조회 오류:`, error);
+          console.error(`${date} 다짐/응원의 말 조회 오류:`, error);
           return null;
         }
 
@@ -189,7 +189,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
         return null;
       }
     } catch (error) {
-      console.error(`${date} 각오 조회 실패:`, error);
+      console.error(`${date} 다짐/응원의 말 조회 실패:`, error);
       return null;
     }
   };
@@ -653,7 +653,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
   const handleWriteResolution = () => {
     // 수행 목록이 없으면 알림창 표시
     if (allGoalsWithCheck.length === 0) {
-      Alert.alert("알림", "수행 목록을 먼저 작성해주세요. 목표가 있어야 각오/다짐을 작성할 수 있습니다.");
+      Alert.alert("알림", "수행 목록을 먼저 작성해주세요. 목표가 있어야 다짐/응원의 말을 작성할 수 있습니다.");
       return;
     }
     
@@ -663,12 +663,12 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
 
   const handleSaveResolution = async () => {
     if (!resolutionText.trim()) {
-      Alert.alert("알림", "각오를 입력해주세요.");
+      Alert.alert("알림", "다짐/응원의 말를 입력해주세요.");
       return;
     }
 
     if (resolutionText.length > 100) {
-      Alert.alert("알림", "각오는 100자 이내로 작성해주세요.");
+      Alert.alert("알림", "다짐/응원의 말는 100자 이내로 작성해주세요.");
       return;
     }
 
@@ -677,7 +677,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       
       // 기존 각오가 있으면 경고 메시지 표시
       if (myResolution) {
-        Alert.alert("알림", "이미 오늘의 각오가 작성되어 있습니다. 하루에 하나의 각오만 작성할 수 있습니다.");
+        Alert.alert("알림", "이미 오늘의 다짐/응원의 말이 작성되어 있습니다. 하루에 하나만 작성할 수 있습니다.");
         setIsWritingResolution(false);
         setResolutionText("");
         return;
@@ -686,9 +686,9 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
       await saveResolution(resolutionText.trim());
       setIsWritingResolution(false);
       setResolutionText("");
-      Alert.alert("성공", "각오/다짐이 저장되었습니다! 💪");
+      Alert.alert("성공", "다짐/응원의 말이 저장되었습니다! 💪");
     } catch (error: any) {
-      Alert.alert("오류", error.message || "각오/다짐 저장에 실패했습니다.");
+      Alert.alert("오류", error.message || "다짐/응원의 말 저장에 실패했습니다.");
     }
   };
 
@@ -699,7 +699,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
   };
 
   const handleDeleteResolution = () => {
-    Alert.alert("삭제 확인", "정말로 각오/다짐을 삭제하시겠습니까?", [
+    Alert.alert("삭제 확인", "정말로 다짐/응원의 말을 삭제하시겠습니까?", [
       { text: "취소", style: "cancel" },
       {
         text: "삭제",
@@ -707,11 +707,11 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
         onPress: async () => {
           try {
             await deleteMyResolution();
-            Alert.alert("성공", "각오/다짐이 삭제되었습니다.");
+            Alert.alert("성공", "다짐/응원의 말이 삭제되었습니다.");
           } catch (error: any) {
             Alert.alert(
               "오류",
-              error.message || "각오/다짐 삭제에 실패했습니다.",
+              error.message || "다짐/응원의 말 삭제에 실패했습니다.",
             );
           }
         },
@@ -896,7 +896,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                 마음의 준비는 어제부터 시작됩니다
               </Text>
               <Text style={styles.resolutionGuideSubText}>
-                내일을 위한 다짐을 미리 준비해보세요
+                내일을 위한 다짐/응원을 미리 준비해보세요
               </Text>
             </View>
           )}
@@ -910,7 +910,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                   onPress={handleWriteResolution}
                 >
                   <Text style={styles.resolutionWriteButtonText}>
-                    내일을 위한 각오/다짐 작성하기
+                    내일을 위한 다짐/응원의 말 작성하기
                   </Text>
                 </TouchableOpacity>
               )}
@@ -919,7 +919,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                 <View style={styles.resolutionWriteSection}>
                   <TextInput
                     style={styles.resolutionTextInput}
-                    placeholder="내일을 위한 각오/다짐을 입력해주세요 (최대 100자)"
+                    placeholder="내일을 위한 다짐/응원의 말을 입력해주세요 (최대 100자)"
                     value={resolutionText}
                     onChangeText={setResolutionText}
                     multiline
@@ -1009,7 +1009,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                         try {
                           await deleteMyResolution();
                           setIsResolutionExpanded(false);
-                          Alert.alert("성공", "각오/다짐이 삭제되었습니다.");
+                          Alert.alert("성공", "다짐/응원의 말이 삭제되었습니다.");
                         } catch (error: any) {
                           Alert.alert(
                             "오류",
