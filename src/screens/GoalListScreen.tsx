@@ -496,55 +496,30 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
         
         // 날짜 업데이트
         if (detectedDisplayDate !== currentDisplayDate) {
-          console.log('🔄 currentDisplayDate 업데이트:', { 
-            이전: currentDisplayDate, 
-            새로운: detectedDisplayDate 
-          });
+          console.log('🔄 currentDisplayDate:', detectedDisplayDate);
           setCurrentDisplayDate(detectedDisplayDate);
         }
         
-        console.log("🔍 자유 목표 & 각오/응원의 말 업데이트:", {
-          날짜: detectedDisplayDate,
-          자유목표개수: flexibleGoals.length,
-          목표종류: todayGoals.length > 0 ? "오늘목표" : "내일목표",
-          현재currentFlexibleGoals: currentFlexibleGoals,
-          새로운flexibleGoals: flexibleGoals,
-          실제조회된데이터: flexibleGoals.map(g => ({ title: g.title, date: g.date }))
-        });
+        console.log("🔍 목표 업데이트:", detectedDisplayDate);
       }
     } else {
-      // 목표가 없는 경우: 오늘 날짜로 각오/응원의 말 조회
-      const detectedDisplayDate = currentTodayKey;
+      // 🎯 목표가 없는 경우: 홈화면 비어있음 → D+1 로직 적용
+      const detectedDisplayDate = "";  // 빈 문자열로 설정
       
-      // 🚨 목표가 없는 경우 자유 목표도 초기화
-      const { getGoalsByDate } = useFlexibleGoalStore.getState();
-      const flexibleGoals = getGoalsByDate(detectedDisplayDate);
-      setCurrentFlexibleGoals(flexibleGoals);
+      // 자유 목표 초기화
+      setCurrentFlexibleGoals([]);
       
       if (detectedDisplayDate !== currentDisplayDate) {
-        console.log('🔄 목표없음-currentDisplayDate 업데이트:', { 
-          이전: currentDisplayDate, 
-          새로운: detectedDisplayDate 
-        });
+        console.log('🔄 홈화면 비어있음 - currentDisplayDate 초기화');
         setCurrentDisplayDate(detectedDisplayDate);
       }
-      
-      console.log("🔍 목표 없음 - 자유 목표도 초기화:", {
-        날짜: detectedDisplayDate,
-        현재currentFlexibleGoals: currentFlexibleGoals,
-        새로운flexibleGoals: flexibleGoals,
-        실제조회된데이터: flexibleGoals.map(g => ({ title: g.title, date: g.date }))
-      });
     }
   }, [allGoalsWithCheck, todayRetrospectExists]);
 
-  // 직접 계산하여 리렌더링 문제 해결
-  console.log("🔥 sections 계산 시작!");
+  // sections 계산
   const sections: GoalSection[] = (() => {
-    // 실시간 날짜 키 계산
     const { todayKey: currentTodayKey, tomorrowKey: currentTomorrowKey } =
       getCurrentDateKeys();
-    console.log("📅 Date keys updated");
 
     // 한국 시간 기준으로 날짜 구분하여 필터링 (회고 버튼과 동일한 방식)
     const todayGoals = allGoalsWithCheck
@@ -584,13 +559,7 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
     const sections: GoalSection[] = [];
 
     // 홈 화면 표시 로직 개선: 날짜 기반으로 정확한 타이틀 표시
-    console.log("📅 타이틀 결정을 위한 날짜 분석:", {
-      currentTodayKey,
-      currentTomorrowKey,
-      todayGoalsCount: todayGoals.length,
-      tomorrowGoalsCount: tomorrowGoals.length,
-      todayRetrospectExists,
-    });
+    // 날짜별 목표 분류 완료
 
     // 시간대 기반 타이틀 결정 로직 개선
     const getTitleBasedOnTime = (isToday: boolean, goalCount: number) => {
@@ -1168,42 +1137,29 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                 // currentDisplayDate와 오늘/내일 날짜 비교하여 정확한 initial 설정
                 const { todayKey, tomorrowKey } = getCurrentDateKeys();
                 
-                // 🔧 디버그: currentDisplayDate 상태 확인
-                console.log("🔧 currentDisplayDate 디버그:", {
-                  currentDisplayDate,
-                  currentDisplayDateType: typeof currentDisplayDate,
-                  currentDisplayDateLength: currentDisplayDate.length,
-                  todayKey,
-                  tomorrowKey,
-                  isEmpty: currentDisplayDate === "",
-                  상태: currentDisplayDate === "" ? "비어있음" : "설정됨"
-                });
+                // currentDisplayDate 상태 확인
+                console.log("📅 currentDisplayDate:", currentDisplayDate || "비어있음");
                 
                 let initialMode: string;
                 
-                if (currentDisplayDate === todayKey) {
+                // 🎯 올바른 로직: 사용자 의도에 맞는 초기 모드 결정
+                if (currentDisplayDate === "") {
+                  // 홈화면 비어있음 → D+1 목표 설정 (제한 없음)
+                  initialMode = "tomorrow";
+                  console.log("✅ 홈화면 비어있음 → tomorrow 모드");
+                } else if (currentDisplayDate === todayKey) {
+                  // 오늘 목표 있음 → 당일 추가 (3시간 제한 적용)
                   initialMode = "today";
-                  console.log("✅ initialMode = 'today' 설정됨");
-                } else if (currentDisplayDate === tomorrowKey) {
-                  initialMode = "tomorrow";
-                  console.log("✅ initialMode = 'tomorrow' 설정됨");
+                  console.log("✅ 오늘 목표 있음 → today 모드 (3시간 제한)");
                 } else {
-                  // 기본적으로 내일 모드 (안전한 선택)
+                  // 내일 목표만 있음 → 내일 추가 (제한 없음)
                   initialMode = "tomorrow";
-                  console.log("✅ initialMode = 'tomorrow' (기본값) 설정됨");
+                  console.log("✅ 내일 목표만 있음 → tomorrow 모드");
                 }
                 
-                console.log("🚀 목표 추가 - 상세 디버깅:", {
-                  currentDisplayDate,
-                  todayKey,
-                  tomorrowKey,
-                  todayMatches: currentDisplayDate === todayKey,
-                  tomorrowMatches: currentDisplayDate === tomorrowKey,
-                  initialMode: initialMode,
-                  로직: "currentDisplayDate 기반 정확한 모드 선택"
-                });
+                console.log("🚀 목표 추가:", { initialMode, currentDisplayDate });
 
-                // ⏰ 8:30 PM 이후 체크 (오늘 목표 추가 시에만)
+                // ⏰ 오후 8:30 이후 당일 목표 추가 제한 (3시간 룰)
                 if (initialMode === "today") {
                   const now = new Date();
                   const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
@@ -1211,38 +1167,24 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                   const currentHour = nowKorea.getHours();
                   const currentMinute = nowKorea.getMinutes();
                   const currentTimeInMinutes = currentHour * 60 + currentMinute;
-                  const targetTimeInMinutes = 20 * 60 + 30; // 8:30 PM = 1230분
+                  const limitTimeInMinutes = 20 * 60 + 30; // 8:30 PM
 
-                  console.log("⏰ 8:30 PM 체크 (수정됨):", {
-                    현재UTC: now.toISOString(),
-                    한국시간: nowKorea.toLocaleString("ko-KR"),
-                    currentHour,
-                    currentMinute,
-                    currentTime: `${currentHour}:${currentMinute.toString().padStart(2, '0')}`,
-                    currentTimeInMinutes,
-                    targetTime: "20:30",
-                    targetTimeInMinutes,
-                    isAfter830PM: currentTimeInMinutes >= targetTimeInMinutes
-                  });
-
-                  if (currentTimeInMinutes >= targetTimeInMinutes) {
+                  if (currentTimeInMinutes >= limitTimeInMinutes) {
                     Alert.alert(
-                      "⏰ 늦은 시간 목표 추가",
-                      "오후 8:30 이후에는 \n\n추가 목록을 설정하실 수 없습니다.",
+                      "⏰ 당일 목표 추가 제한",
+                      "오후 8:30 이후에는 당일 목표를 추가할 수 없습니다.",
                       [
                         { 
                           text: "확인", 
                           style: "cancel" 
-                        },
+                        }
                       ]
                     );
-                    return; // 알림 표시 후 함수 종료
+                    return;
                   }
                 }
                 
-                console.log("🚀 navigation.navigate 호출 직전:", { initial: initialMode });
                 navigation.navigate("TimeSelect", { initial: initialMode });
-                console.log("🚀 navigation.navigate 호출 완료");
               } catch (error) {
                 console.error("❌ navigate 호출 중 오류:", error);
               }

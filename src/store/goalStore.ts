@@ -599,24 +599,8 @@ const useGoalStore = create<GoalState>((set, get) => ({
     const nowKorea = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     const targetKorea = new Date(targetTime.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     
-    if (settings.goalAlarms && targetKorea > nowKorea) {
-      if (__DEV__) console.log("🔔 목표 알림 스케줄링 (한국시간):", {
-        목표: row.title,
-        UTC설정시간: targetTime.toISOString(),
-        한국목표시간: targetKorea.toLocaleString('ko-KR'),
-        한국현재시간: nowKorea.toLocaleString('ko-KR'),
-        미래여부: targetKorea > nowKorea
-      });
-      // 🔕 알림 시스템 비활성화됨 - 스케줄링 스킵
-      console.log('🔕 알림 시스템 비활성화됨 - 목표 알림 스케줄링 스킵');
-      
-      // 디버깅용 - 알림 스케줄링 후 즉시 확인
-      console.log("🔍 목표 추가 후 알림 확인 완료");
-    } else if (targetKorea <= nowKorea) {
-      if (__DEV__) console.log("⏰ 목표 시간이 이미 지나서 알림 설정 안함 (한국시간 기준)");
-    } else {
-      if (__DEV__) console.log("🔕 목표 알림이 비활성화되어 있어 알림 건너뜀");
-    }
+    // 🔕 알림 시스템 비활성화됨 - 스케줄링 스킵
+    console.log('🔕 알림 시스템 비활성화됨 - 목표 알림 스케줄링 스킵');
 
     // 🚫 회고 알림 중복 실행 방지 (목표 추가 시에만 실행)
     console.log("🚫 단일 목표 추가 - 회고 알림 스케줄링 안함");
@@ -966,22 +950,7 @@ const useGoalStore = create<GoalState>((set, get) => ({
         const userDisplayName = profileData?.display_name || undefined;
         
         // 🔕 알림 시스템 비활성화됨 - 설정 확인 스킵
-        // 🚫 목표 수정 시 알림 스팸 방지 - 10분 후 목표만 재스케줄링 (비활성화됨)
-        if (settings.goalAlarms) {
-          const targetTime = new Date(updatedGoal.target_time);
-          const nowKorea = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-          const timeDifferenceMinutes = (targetTime.getTime() - nowKorea.getTime()) / (1000 * 60);
-          
-          if (timeDifferenceMinutes > 10) {
-            console.log("🔔 목표 수정으로 알림 재스케줄링 (10분 후 목표만)");
-            // 🔕 알림 시스템 비활성화됨 - 알림 재스케줄링 스킵
-            console.log('🔕 알림 시스템 비활성화됨 - 목표 알림 재설정 스킵');
-          } else {
-            console.log(`🚫 목표 수정 시 알림 스팸 방지 - 목표까지 ${Math.round(timeDifferenceMinutes)}분 남아서 알림 설정 안함`);
-          }
-        } else {
-          console.log("🔕 목표 알림이 비활성화되어 있어 스케줄링 건너뜀");
-        }
+        console.log("🔕 목표 알림이 비활성화되어 있어 스케줄링 건너뜀");
         
         // 🚫 목표 수정 시 회고 알림 중복 실행 방지 (새 목표 추가시에만 실행)
       }

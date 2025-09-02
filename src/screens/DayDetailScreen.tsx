@@ -432,13 +432,13 @@ export default function DayDetailScreen({ route, navigation }: any) {
       )}
 
       {/* ---- 각오/다짐 ---- */}
-      <Text style={s.sectionTitle}>각오/다짐</Text>
+      <Text style={s.sectionTitle}>각오/응원의 말</Text>
       {resolution ? (
         <View style={s.resolutionContainer}>
           <Text style={s.resolutionText}>{resolution}</Text>
         </View>
       ) : (
-        <Text style={s.empty}>각오 없음</Text>
+        <Text style={s.empty}>각오/응원의 말 없음</Text>
       )}
 
       {/* ---- 회고 ---- */}

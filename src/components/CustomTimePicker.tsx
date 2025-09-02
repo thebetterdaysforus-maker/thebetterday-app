@@ -41,7 +41,7 @@ export default function CustomTimePicker({
     }
   }, []); // fetchGoals 의존성 제거로 무한 루프 방지
 
-  // 초기값은 선택되지 않은 상태로 시작
+  // 🎯 사용자가 직접 선택하도록 초기값 비움
   const [hour, setHour] = useState<number | null>(null);
   const [minute, setMinute] = useState<number | null>(null);
   const [isPM, setIsPM] = useState<boolean | null>(null);
@@ -227,20 +227,26 @@ export default function CustomTimePicker({
     return !hasDBConflict && !hasConflictingTimesConflict;
   };
 
-  // 시간 선택 핸들러
+  // APK 호환성: 즉시 상태 업데이트 보장
   const handleHourSelect = (selectedHour: number) => {
+    console.log('🕐 APK 시간 선택:', selectedHour);
     setHour(selectedHour);
-    updateTime(selectedHour, minute, isPM);
+    // APK에서 상태 업데이트 지연 방지를 위해 setTimeout 추가
+    setTimeout(() => updateTime(selectedHour, minute, isPM), 0);
   };
 
   const handleMinuteSelect = (selectedMinute: number) => {
+    console.log('⏰ APK 분 선택:', selectedMinute);
     setMinute(selectedMinute);
-    updateTime(hour, selectedMinute, isPM);
+    // APK에서 상태 업데이트 지연 방지를 위해 setTimeout 추가
+    setTimeout(() => updateTime(hour, selectedMinute, isPM), 0);
   };
 
   const handleAmPmToggle = (newIsPM: boolean) => {
+    console.log('🌅 APK AM/PM 선택:', newIsPM ? 'PM' : 'AM');
     setIsPM(newIsPM);
-    updateTime(hour, minute, newIsPM);
+    // APK에서 상태 업데이트 지연 방지를 위해 setTimeout 추가
+    setTimeout(() => updateTime(hour, minute, newIsPM), 0);
   };
 
   // 현재 선택된 시간의 유효성
@@ -349,6 +355,8 @@ export default function CustomTimePicker({
                         isSelected && styles.timeItemSelected,
                       ]}
                       onPress={() => handleHourSelect(h)}
+                      activeOpacity={0.7}
+                      delayPressIn={0}
                     >
                       <Text
                         style={[
@@ -383,6 +391,8 @@ export default function CustomTimePicker({
                         isSelected && styles.timeItemSelected,
                       ]}
                       onPress={() => handleMinuteSelect(m)}
+                      activeOpacity={0.7}
+                      delayPressIn={0}
                     >
                       <Text
                         style={[
@@ -516,6 +526,9 @@ const styles = StyleSheet.create({
     height: 240,
     width: "100%",
     minWidth: 120,
+    // APK 스크롤 성능 최적화
+    removeClippedSubviews: true,
+    showsVerticalScrollIndicator: false,
   },
   scrollContent: {
     paddingVertical: 10,
