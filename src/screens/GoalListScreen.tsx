@@ -1183,8 +1183,30 @@ export default function GoalListScreen({ navigation: navProp, route }: any) {
                     return;
                   }
                 }
-                
-                navigation.navigate("TimeSelect", { initial: initialMode });
+
+                // 🎯 목표 개수에 따른 화면 선택 (회고 후 + 버튼과 동일한 로직)
+                if (initialMode === "tomorrow") {
+                  // 내일 목표 개수 확인
+                  const tomorrowGoals = allGoalsWithCheck.filter((x) => {
+                    const goalDate = new Date(x.goal.target_time);
+                    const koreanDate = new Date(
+                      goalDate.getTime() + 9 * 60 * 60 * 1000,
+                    );
+                    return koreanDate.toISOString().slice(0, 10) === tomorrowKey;
+                  });
+
+                  if (tomorrowGoals.length < 5) {
+                    console.log("🚀 메인 + 버튼 - GoalBatch로 이동 (내일 목표 5개 미만)");
+                    navigation.navigate("GoalBatch", { initial: initialMode });
+                  } else {
+                    console.log("🚀 메인 + 버튼 - TimeSelect로 이동 (내일 목표 5개 이상)");
+                    navigation.navigate("TimeSelect", { initial: initialMode });
+                  }
+                } else {
+                  // today 모드는 항상 개별 추가
+                  console.log("🚀 메인 + 버튼 - TimeSelect로 이동 (당일 목표)");
+                  navigation.navigate("TimeSelect", { initial: initialMode });
+                }
               } catch (error) {
                 console.error("❌ navigate 호출 중 오류:", error);
               }
