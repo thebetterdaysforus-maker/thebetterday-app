@@ -1,0 +1,2682 @@
+// src/screens/GoalListScreen.tsx
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import {
+  Alert,
+  AppState,
+  AppStateStatus,
+  Button,
+  SectionList,
+  SectionListData,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  Modal,
+  Image,
+  RefreshControl,
+  StatusBar,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import useGoalStore, { Goal } from "../store/goalStore";
+import useProfileStore from "../store/profileStore";
+import useRetrospectStore from "../store/retrospectStore";
+import useCommunityStore from "../store/communityStore";
+import { useFlexibleGoalStore } from "../store/flexibleGoalStore";
+import { useAppLifecycle } from "../hooks/useAppLifecycle";
+import { registerGlobalDebugFunctions } from "../utils/globalDebugFunctions";
+import { FLATLIST_OPTIMIZATION_PROPS } from "../utils/performanceOptimizer";
+import { useOptimizedGoals } from "../hooks/useOptimizedGoals";
+
+import { getTodayKorea, getTomorrowKorea, getKoreaTime } from "../utils/timeUtils";
+import { supabase } from "../supabaseClient";
+import { getBadgeImage } from "../utils/badgeImageMap";
+import { DailyStreakManager } from "../utils/streakBadgeSystem";
+// 스타일 상수 제거
+import UIButton from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import { Ionicons } from "@expo/vector-icons";
+
+/* ───── 날짜 유틸 ───── */
+const ymd = (d: Date | string) =>
+  (typeof d === "string" ? d : d.toISOString()).slice(0, 10);
+// 실시간으로 날짜 계산 (컴포넌트 렌더링 시마다 갱신)
+const getCurrentDateKeys = () => {
+  // 수정된 timeUtils 함수를 사용
+  const todayKey = getTodayKorea();
+  const tomorrowKey = getTomorrowKorea();
+
+  return { todayKey, tomorrowKey };
+};
+
+/* ───── 타입 ───── */
+interface GoalSection {
+  title: string;
+  data: { goal: Goal; canCheck: boolean; canEdit: boolean }[];
+}
+
+/* ─────────────────────────────────────── */
+// 타입 정의
+type RootStackParamList = {
+  GoalList: undefined;
+  GoalDetail: { goalId: string };
+  GoalBatch: { initial?: string };
+  TimeSelect: { initial?: string };
+  Retrospect: undefined;
+  FlexibleGoal: { targetDate: string };
+};
+
+type GoalListScreenNavigationProp =
+  NativeStackNavigationProp<RootStackParamList>;
+
+export default function GoalListScreen({ navigation: navProp, route }: any) {
+  // GoalListScreen 컴포넌트 렌더링
+
+  // useNavigation hook을 사용하여 더 안정적인 navigation 참조
+  const navigation = useNavigation() as any;
+
+  // SafeArea 인셋을 가져와서 동적 패딩 적용
+  const insets = useSafeAreaInsets();
+
+  // 신규 사용자 첫 방문 체크
+  const isFirstTimeUser = route?.params?.firstTimeUser;
+
+  // Navigation 객체 상태 확인
+
+  /* store */
+  const {
+    goals,
+    fetchGoals: fetchGoalsOriginal,
+    checkGoal,
+    expireOverdueGoals,
+    getGoalsWithCanCheck,
+    cleanupOldGoals,
+    addAchievementMemo,
+    getCurrentStreak,
+    getStreakCategory,
+    streakBadge,
+    goalBadges,
+  } = useGoalStore();
+
+  // fetchGoals 래퍼 함수로 디버깅 및 오류 처리 강화
+  const fetchGoals = async () => {
+    // 목표 데이터 가져오기 시도
+    try {
+      await fetchGoalsOriginal();
+      // 목표 데이터 로드 완료
+    } catch (error) {
+      console.error("❌ fetchGoalsOriginal 실행 오류:", error);
+
+      // 네트워크 관련 오류 구분
+      const isNetworkError =
+        error instanceof TypeError &&
+        (error.message.includes("Network request failed") ||
+          error.message.includes("fetch"));
+
+      const errorMessage = isNetworkError
+        ? "인터넷 연결이 불안전합니다! 다시 시도해주세요."
+        : "목표 목록을 불러오는 중 문제가 발생했습니다. 앱을 새로고침하거나 다시 시도해주세요.";
+
+      // 오류 발생 시 사용자에게 알림 표시
+      Alert.alert("목표 불러오기 실패", errorMessage, [
+        { text: "다시 시도", onPress: () => fetchGoals() },
+        { text: "확인", style: "cancel" },
+      ]);
+    }
+  };
+  const { profile, updateDream, fetchProfile } = useProfileStore();
+  const { todayRetrospectExists, fetchToday, saveRetrospect } = useRetrospectStore();
+  const {
+    myResolution,
+    fetchMyResolution,
+    saveMyResolution: saveResolution,
+    deleteMyResolution,
+    toggleMyResolutionPublic,
+  } = useCommunityStore();
+  const {
+    goals: flexibleGoals,
+    fetchGoals: fetchFlexibleGoals,
+    checkGoal: checkFlexibleGoal,
+    getTomorrowGoals: getTomorrowFlexibleGoals,
+    hasTodayGoal: hasFlexibleTodayGoal,
+    hasTomorrowGoal: hasFlexibleTomorrowGoal,
+  } = useFlexibleGoalStore();
+
+  // 📱 앱 생명주기 관리 - 스마트 알림 제어
+  const { isActive } = useAppLifecycle();
+
+  /* 꿈 편집 상태 */
+  const [isEditingDream, setIsEditingDream] = useState(false);
+  const [dreamText, setDreamText] = useState("");
+  const [showDayRecordModal, setShowDayRecordModal] = useState(false);
+
+  /* 각오/응원의 말 편집 상태 */
+  const [isWritingResolution, setIsWritingResolution] = useState(false);
+  const [resolutionText, setResolutionText] = useState("");
+  const [isResolutionExpanded, setIsResolutionExpanded] = useState(false);
+  const [todayResolution, setTodayResolution] = useState<string | null>(null);
+  const [currentDisplayDate, setCurrentDisplayDate] = useState("");
+  const [currentFlexibleGoals, setCurrentFlexibleGoals] = useState<any[]>([]);
+
+  /* ---------- 동적 각오/응원의 말 조회 함수 ---------- */
+  const fetchResolutionForDate = async (date: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        const { data, error } = await supabase
+          .from('daily_resolutions')
+          .select('content')
+          .eq('user_id', session.user.id)
+          .eq('date', date)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error(`${date} 각오/응원의 말 조회 오류:`, error);
+          return null;
+        }
+
+        return data?.content || null;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error(`${date} 각오/응원의 말 조회 실패:`, error);
+      return null;
+    }
+  };
+
+  /* 메모 관련 상태 */
+  const [memoModalVisible, setMemoModalVisible] = useState(false);
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [memoText, setMemoText] = useState("");
+
+  /* 회고 관련 상태 */
+  const [retrospectText, setRetrospectText] = useState("");
+
+  /* 당겨서 새로고침 상태 */
+  const [refreshing, setRefreshing] = useState(false);
+
+  /* ───── 신규 사용자 첫 목표 작성 자동 이동 ───── */
+  useEffect(() => {
+    const params = route?.params as any;
+    const isFirstTimeUser = params?.firstTimeUser;
+
+    if (isFirstTimeUser && navigation) {
+      console.log("🎯 신규 사용자 감지 - 예정 목표 작성으로 자동 이동");
+      // 약간의 지연 후 자동 이동 (UI 안정화)
+      const timer = setTimeout(() => {
+        navigation.navigate("GoalBatch", { initial: "tomorrow" });
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [route?.params, navigation]);
+
+  /* ───── 통합 동기화 시스템 적용 ───── */
+  useEffect(() => {
+    const handleAppActive = async (state: string) => {
+      if (state === "active") {
+        console.log('📱 앱 활성화 - 통합 동기화 시작');
+        // 마스터 데이터 관리자로 모든 동기화 처리
+        const { masterDataManager } = await import('../store/masterDataManager');
+        const success = await masterDataManager.syncOnAppResume();
+        
+        if (success) {
+          console.log('✅ 앱 복귀 동기화 완료');
+          // 만료 처리만 별도 실행
+          expireOverdueGoals();
+        } else {
+          console.log('⚠️ 앱 복귀 동기화 일부 실패');
+        }
+      }
+    };
+    const subscription = AppState.addEventListener("change", handleAppActive);
+
+    // 초기 실행은 App.tsx의 masterDataManager에서 처리됨
+    console.log("🚀 GoalListScreen 초기화 - 마스터 동기화 의존");
+    
+    // 🔥 회고 상태 강제 동기화 (날짜 변경 감지)
+    fetchToday().catch(console.error);
+    
+    // 🔥 자유목표 데이터 초기 로딩
+    fetchFlexibleGoals().catch(console.error);
+
+    return () => subscription?.remove();
+  }, [expireOverdueGoals]);
+
+  /* 통합 당겨서 새로고침 */
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      console.log("🔄 당겨서 새로고침 - 통합 동기화");
+
+      // 마스터 데이터 관리자로 모든 동기화 처리
+      const { masterDataManager } = await import('../store/masterDataManager');
+      const success = await masterDataManager.syncOfflineData();
+      
+      if (success) {
+        console.log("✅ 당겨서 새로고침 완료");
+      } else {
+        // 실패 시 개별 동기화 시도
+        await Promise.all([
+          fetchGoals(),
+          fetchProfile(),
+          fetchToday(),
+          fetchMyResolution(),
+          fetchFlexibleGoals(),
+          expireOverdueGoals(),
+        ]);
+      }
+
+      console.log("✅ 당겨서 새로고침 완료");
+
+      // 성공 피드백 (옵션)
+      // Alert.alert("새로고침 완료", "최신 데이터로 업데이트되었습니다");
+    } catch (error) {
+      console.error("❌ 새로고침 오류:", error);
+      Alert.alert("새로고침 실패", "데이터를 불러오는 중 오류가 발생했습니다");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // 화면 포커스 시 데이터 새로고침
+  useEffect(() => {
+    if (!navigation) return;
+
+    const unsubscribe = navigation.addListener("focus", () => {
+      console.log("🔄 GoalListScreen 포커스 - 데이터 새로고침");
+      fetchProfile();
+      fetchGoals().catch(console.error);
+    });
+    return unsubscribe;
+  }, [navigation, fetchProfile, fetchGoals]);
+
+  /* ───── 성능 최적화된 상태 업데이트 ───── */
+  const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+  const [appState, setAppState] = useState(AppState.currentState);
+  const intervalRef = useRef<number | null>(null);
+
+  // 앱 상태 변화 감지 (메모이제이션)
+  const handleAppStateChange = useCallback(async (nextAppState: AppStateStatus) => {
+    console.log("🔄 앱 상태 변화:", appState, "→", nextAppState);
+    setAppState(nextAppState);
+    
+    // 앱 활성화 시 즉시 동기화 실행
+    if (nextAppState === 'active') {
+      console.log("🔄 앱 활성화 - 즉시 동기화 실행");
+      await expireOverdueGoals();
+      forceUpdate();
+    }
+  }, [appState, expireOverdueGoals]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription?.remove();
+  }, [handleAppStateChange]);
+
+  // 하이브리드 간격 시스템
+  useEffect(() => {
+    const setupInterval = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+
+      // 스마트 적응형 간격 시스템
+      const calculateSmartInterval = () => {
+        if (appState !== "active") return 300000; // 5분 (비활성)
+        
+        // 목표 시간과의 거리에 따라 간격 조정
+        const now = new Date();
+        const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+        
+        const nearestGoalTime = allGoalsWithCheck
+          .filter(item => item.goal.status === "pending")
+          .map(item => {
+            const goalTime = new Date(item.goal.target_time);
+            return goalTime.getTime() - koreaTime.getTime();
+          })
+          .filter(timeDiff => timeDiff > 0)
+          .sort((a, b) => a - b)[0];
+        
+        if (!nearestGoalTime) return 120000; // 2분 (목표 없음)
+        if (nearestGoalTime <= 60000) return 15000; // 15초 (1분 이내)
+        if (nearestGoalTime <= 300000) return 60000; // 1분 (5분 이내)
+        return 120000; // 2분 (일반)
+      };
+
+      const intervalTime = calculateSmartInterval();
+      const intervalLabel = {
+        15000: "15초 (목표 임박)",
+        60000: "1분 (목표 근접)",
+        120000: "2분 (일반)",
+        300000: "5분 (비활성)"
+      }[intervalTime] || `${intervalTime/1000}초`;
+
+      console.log(`🔄 스마트 간격 설정: ${intervalLabel}`);
+
+      intervalRef.current = setInterval(async () => {
+        const now = new Date();
+        const koreaTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+        const hasNearbyGoal = allGoalsWithCheck.some(item => {
+          const goalTime = new Date(item.goal.target_time);
+          const timeDiff = goalTime.getTime() - koreaTime.getTime();
+          return timeDiff > 0 && timeDiff <= 120000; // 2분 이내
+        });
+        
+        if (hasNearbyGoal) {
+          console.log("🔥 목표 시간 2분 이내 - 집중 모니터링");
+        }
+        
+        await expireOverdueGoals();
+        forceUpdate(); // UI 강제 리렌더링
+        
+        // 간격 재계산을 위해 타이머 재설정
+        clearInterval(intervalRef.current!);
+        setTimeout(setupInterval, 100); // 0.1초 후 재설정
+      }, intervalTime);
+    };
+
+    setupInterval();
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [appState, expireOverdueGoals]);
+
+
+  /* 각오/응원의 말: currentDisplayDate 변경 시 동적 조회 */
+  useEffect(() => {
+    console.log('⚡ 각오/응원의 말 useEffect 실행:', { currentDisplayDate });
+    
+    const fetchCurrentResolution = async () => {
+      if (currentDisplayDate) {
+        console.log('🔍 각오/응원의 말 조회 시작:', currentDisplayDate);
+        const resolution = await fetchResolutionForDate(currentDisplayDate);
+        console.log('🎯 setTodayResolution 호출 전:', { resolution, 현재todayResolution: todayResolution });
+        setTodayResolution(resolution);
+        console.log(`🔍 각오/응원의 말 동적 조회 (${currentDisplayDate}):`, resolution);
+      } else {
+        console.log('❌ currentDisplayDate 비어있음:', currentDisplayDate);
+      }
+    };
+    
+    fetchCurrentResolution();
+  }, [currentDisplayDate]);
+
+  // 앱이 활성화될 때 즉시 업데이트
+  useEffect(() => {
+    if (appState === "active") {
+      console.log("🔄 앱 활성화 - 즉시 상태 업데이트");
+      expireOverdueGoals().then(() => forceUpdate());
+    }
+  }, [appState, expireOverdueGoals]);
+
+  // 전역 디버깅 함수 등록
+  useEffect(() => {
+    registerGlobalDebugFunctions();
+  }, []);
+
+  /* ───── 계산 ───── */
+  const allGoalsWithCheck = useMemo(() => {
+    console.log("🔄 allGoalsWithCheck 계산 시작!", {
+      goals: goals.length,
+      todayRetrospectExists,
+    });
+    const result = getGoalsWithCanCheck(todayRetrospectExists);
+    console.log(
+      "🔄 UI 업데이트 - 전체 목표들:",
+      result.map((r) => ({
+        title: r.goal.title,
+        date: r.goal.target_time.slice(0, 10),
+        canCheck: r.canCheck,
+        canEdit: r.canEdit,
+      })),
+    );
+    return result;
+  }, [goals, todayRetrospectExists, getGoalsWithCanCheck]);
+
+  /* 자유 목표 & 각오/응원의 말: allGoalsWithCheck 기반 업데이트 */
+  useEffect(() => {
+    // allGoalsWithCheck에서 직접 목표 정보 추출
+    const { todayKey: currentTodayKey, tomorrowKey: currentTomorrowKey } = getCurrentDateKeys();
+    
+    // 오늘 목표와 내일 목표 구분
+    const todayGoals = allGoalsWithCheck.filter((x) => {
+      const goalDate = new Date(x.goal.target_time);
+      const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+      return koreanDate.toISOString().slice(0, 10) === currentTodayKey;
+    });
+
+    const tomorrowGoals = allGoalsWithCheck.filter((x) => {
+      const goalDate = new Date(x.goal.target_time);
+      const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+      return koreanDate.toISOString().slice(0, 10) === currentTomorrowKey;
+    });
+
+    // 표시할 목표 결정 (기존 sections 로직과 동일)
+    let targetGoals: any[] = [];
+    if (todayRetrospectExists) {
+      // 회고 완료 후: 내일 목표 표시
+      if (tomorrowGoals.length > 0) {
+        targetGoals = tomorrowGoals;
+      }
+    } else {
+      // 회고 작성 전: 오늘 목표 우선, 없으면 내일 목표
+      if (todayGoals.length > 0) {
+        targetGoals = todayGoals;
+      } else if (tomorrowGoals.length > 0) {
+        targetGoals = tomorrowGoals;
+      }
+    }
+
+    if (targetGoals.length > 0) {
+      const firstGoal = targetGoals[0]?.goal;
+      if (firstGoal) {
+        const goalDate = new Date(firstGoal.target_time);
+        const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+        const detectedDisplayDate = koreanDate.toISOString().slice(0, 10);
+        
+        // 자유 목표 조회 및 업데이트
+        const { getGoalsByDate } = useFlexibleGoalStore.getState();
+        const flexibleGoals = getGoalsByDate(detectedDisplayDate);
+        setCurrentFlexibleGoals(flexibleGoals);
+        
+        // 날짜 업데이트
+        if (detectedDisplayDate !== currentDisplayDate) {
+          console.log('🔄 currentDisplayDate 업데이트:', { 
+            이전: currentDisplayDate, 
+            새로운: detectedDisplayDate 
+          });
+          setCurrentDisplayDate(detectedDisplayDate);
+        }
+        
+        console.log("🔍 자유 목표 & 각오/응원의 말 업데이트:", {
+          날짜: detectedDisplayDate,
+          자유목표개수: flexibleGoals.length,
+          목표종류: todayGoals.length > 0 ? "오늘목표" : "내일목표",
+          현재currentFlexibleGoals: currentFlexibleGoals,
+          새로운flexibleGoals: flexibleGoals,
+          실제조회된데이터: flexibleGoals.map(g => ({ title: g.title, date: g.date }))
+        });
+      }
+    } else {
+      // 목표가 없는 경우: 오늘 날짜로 각오/응원의 말 조회
+      const detectedDisplayDate = currentTodayKey;
+      
+      // 🚨 목표가 없는 경우 자유 목표도 초기화
+      const { getGoalsByDate } = useFlexibleGoalStore.getState();
+      const flexibleGoals = getGoalsByDate(detectedDisplayDate);
+      setCurrentFlexibleGoals(flexibleGoals);
+      
+      if (detectedDisplayDate !== currentDisplayDate) {
+        console.log('🔄 목표없음-currentDisplayDate 업데이트:', { 
+          이전: currentDisplayDate, 
+          새로운: detectedDisplayDate 
+        });
+        setCurrentDisplayDate(detectedDisplayDate);
+      }
+      
+      console.log("🔍 목표 없음 - 자유 목표도 초기화:", {
+        날짜: detectedDisplayDate,
+        현재currentFlexibleGoals: currentFlexibleGoals,
+        새로운flexibleGoals: flexibleGoals,
+        실제조회된데이터: flexibleGoals.map(g => ({ title: g.title, date: g.date }))
+      });
+    }
+  }, [allGoalsWithCheck, todayRetrospectExists]);
+
+  // 직접 계산하여 리렌더링 문제 해결
+  console.log("🔥 sections 계산 시작!");
+  const sections: GoalSection[] = (() => {
+    // 실시간 날짜 키 계산
+    const { todayKey: currentTodayKey, tomorrowKey: currentTomorrowKey } =
+      getCurrentDateKeys();
+    console.log("📅 Date keys updated");
+
+    // 한국 시간 기준으로 날짜 구분하여 필터링 (회고 버튼과 동일한 방식)
+    const todayGoals = allGoalsWithCheck
+      .filter((x) => {
+        const goalDate = new Date(x.goal.target_time);
+        const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+        const goalDateStr = koreanDate.toISOString().slice(0, 10);
+        return goalDateStr === currentTodayKey;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.goal.target_time).getTime() -
+          new Date(b.goal.target_time).getTime(),
+      );
+
+    const tomorrowGoals = allGoalsWithCheck
+      .filter((x) => {
+        const goalDate = new Date(x.goal.target_time);
+        const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+        const goalDateStr = koreanDate.toISOString().slice(0, 10);
+        return goalDateStr === currentTomorrowKey;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.goal.target_time).getTime() -
+          new Date(b.goal.target_time).getTime(),
+      );
+
+    // 목표 개수 및 날짜 키 확인 완료
+
+    // 회고 상태 확인 완료
+
+    // 예정 목표 상세 정보 처리 완료
+
+    // 전체 목표 데이터 확인 및 날짜 분류 완료
+
+    const sections: GoalSection[] = [];
+
+    // 홈 화면 표시 로직 개선: 날짜 기반으로 정확한 타이틀 표시
+    console.log("📅 타이틀 결정을 위한 날짜 분석:", {
+      currentTodayKey,
+      currentTomorrowKey,
+      todayGoalsCount: todayGoals.length,
+      tomorrowGoalsCount: tomorrowGoals.length,
+      todayRetrospectExists,
+    });
+
+    // 시간대 기반 타이틀 결정 로직 개선
+    const getTitleBasedOnTime = (isToday: boolean, goalCount: number) => {
+      if (goalCount === 0) return "수행 목록";
+
+      if (isToday) {
+        // 오늘 목표: 현재 한국 시간과 목표 시간 비교 (정확한 한국 시간 사용)
+        const koreaTime = getKoreaTime(); // timeUtils의 정확한 한국 시간 함수 사용
+
+        const hasPassedGoals = todayGoals.some((goalItem) => {
+          const goalTime = new Date(goalItem.goal.target_time);
+          return goalTime.getTime() <= koreaTime.getTime();
+        });
+
+        // 오늘 목표가 있으면 항상 "수행 목록"으로 표시 (시간 경과 여부와 관계없이)
+        return "수행 목록";
+      } else {
+        // 내일 목표: 항상 "수행 예정 목록"
+        return "수행 예정 목록";
+      }
+    };
+
+    if (todayRetrospectExists) {
+      // 회고 완료 후: 현재 시간보다 미래인 모든 목표 표시
+      const now = new Date();
+      const futureGoals = allGoalsWithCheck.filter(x => {
+        const goalTime = new Date(x.goal.target_time);
+        return goalTime > now;
+      });
+      
+      if (futureGoals.length > 0) {
+        sections.push({ title: "수행 예정 목록", data: futureGoals });
+        console.log(`✅ 회고 완료 → 미래 목표 ${futureGoals.length}개 → '수행 예정 목록'`);
+      }
+    } else {
+      // 회고 작성 전: 모든 목표 표시 (오늘 + 내일)
+      const allGoals = [...todayGoals, ...tomorrowGoals];
+      if (allGoals.length > 0) {
+        // 오늘 목표가 있으면 "수행 목록", 내일 목표만 있으면 "수행 예정 목록"
+        const title = todayGoals.length > 0 ? "수행 목록" : "수행 예정 목록";
+        sections.push({ title, data: allGoals });
+        console.log(`✅ 회고 미완료 → 모든 목표 표시 (오늘 ${todayGoals.length}개 + 내일 ${tomorrowGoals.length}개 = 총 ${allGoals.length}개) → '${title}'`);
+      }
+    }
+
+    console.log("🔍 자유 목표 데이터 준비 완료");
+
+    console.log(
+      "🔥 sections 최종 결과:",
+      sections.map((s) => ({
+        title: s.title,
+        dataCount: s.data.length,
+        dataItems: s.data.map((d) => d.goal.title),
+      })),
+    );
+
+
+    return sections;
+  })();
+
+  // 한국 시간 기준으로 오늘 목표 필터링
+  const { todayKey: realTimeTodayKey } = getCurrentDateKeys();
+  const todayGoalsKorean = allGoalsWithCheck.filter((x) => {
+    const goalDate = new Date(x.goal.target_time);
+    const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+    return koreanDate.toISOString().slice(0, 10) === realTimeTodayKey;
+  });
+
+  const todayCount = todayGoalsKorean.length;
+  const todayGoals = todayGoalsKorean;
+  const allDoneToday =
+    todayGoals.length > 0 &&
+    todayGoals.every((x) => x.goal.status !== "pending");
+  const successCount = todayGoals.filter(
+    (x) => x.goal.status === "success",
+  ).length;
+  const failureCount = todayGoals.filter(
+    (x) => x.goal.status === "failure",
+  ).length;
+
+  // 회고 버튼 활성화 조건 디버깅
+  console.log("🔍 회고 버튼 활성화 조건:", {
+    todayCount,
+    allDoneToday,
+    todayRetrospectExists,
+    조건만족: allDoneToday && !todayRetrospectExists,
+    오늘목표상태: todayGoals.map((g) => ({
+      title: g.goal.title,
+      status: g.goal.status,
+    })),
+  });
+
+  const canWriteToday = !todayRetrospectExists;
+  const canWriteTomorrow = todayRetrospectExists;
+
+  // 내일 목표 존재 여부 확인
+  const tomorrowGoalsExist = useMemo(() => {
+    const { tomorrowKey } = getCurrentDateKeys();
+    const tomorrowGoals = allGoalsWithCheck.filter((x) => {
+      const goalDate = new Date(x.goal.target_time);
+      const koreanDate = new Date(goalDate.getTime() + 9 * 60 * 60 * 1000);
+      return koreanDate.toISOString().slice(0, 10) === tomorrowKey;
+    });
+    return tomorrowGoals.length > 0;
+  }, [allGoalsWithCheck]);
+
+  /* 꿈 편집 핸들러 (최적화) */
+  const handleStartEditDream = useCallback(() => {
+    const currentDream = profile?.dream || "";
+    setDreamText(currentDream);
+    setIsEditingDream(true);
+  }, [profile?.dream]);
+
+  const handleSaveDream = useCallback(async () => {
+    try {
+      // 키보드 먼저 닫기
+      Keyboard.dismiss();
+
+      // 로컬 상태 먼저 업데이트 (즉시 UI 반영)
+      if (profile) {
+        useProfileStore.setState({
+          profile: { ...profile, dream: dreamText.trim() },
+        });
+      }
+
+      // 백그라운드에서 데이터베이스 업데이트
+      await updateDream(dreamText.trim());
+      setIsEditingDream(false);
+      Alert.alert("성공", "꿈이 저장되었습니다! 🌟");
+    } catch (error) {
+      console.error("꿈 저장 실패:", error);
+      Alert.alert("오류", "꿈 저장에 실패했습니다. 다시 시도해주세요.");
+    }
+  }, [profile, dreamText, updateDream]);
+
+  const handleCancelDream = useCallback(() => {
+    // 키보드 먼저 닫기
+    Keyboard.dismiss();
+    setIsEditingDream(false);
+    setDreamText("");
+  }, []);
+
+  /* 각오/응원의 말 편집 핸들러 */
+  const handleWriteResolution = () => {
+    // 수행 목록이 없으면 알림창 표시
+    if (allGoalsWithCheck.length === 0) {
+      Alert.alert("알림", "수행 목록을 먼저 작성해주세요. 목표가 있어야 각오/응원의 말을 작성할 수 있습니다.");
+      return;
+    }
+    
+    setResolutionText(myResolution?.content || "");
+    setIsWritingResolution(true);
+  };
+
+  const handleSaveResolution = async () => {
+    if (!resolutionText.trim()) {
+      Alert.alert("알림", "각오/응원의 말을 입력해주세요.");
+      return;
+    }
+
+    if (resolutionText.length > 100) {
+      Alert.alert("알림", "각오/응원의 말은 100자 이내로 작성해주세요.");
+      return;
+    }
+
+    try {
+      Keyboard.dismiss();
+      
+      // 기존 각오/응원의 말이 있으면 경고 메시지 표시
+      if (myResolution) {
+        Alert.alert("알림", "이미 오늘의 각오/응원의 말이 작성되어 있습니다. 하루에 하나만 작성할 수 있습니다.");
+        setIsWritingResolution(false);
+        setResolutionText("");
+        return;
+      }
+      
+      console.log('🔥 각오/응원의 말 저장 시도:', { 
+        content: resolutionText.trim(), 
+        targetDate: currentDisplayDate,
+        currentDisplayDateType: typeof currentDisplayDate
+      });
+      
+      await saveResolution(resolutionText.trim(), currentDisplayDate);
+      setIsWritingResolution(false);
+      setResolutionText("");
+      Alert.alert("성공", "각오/응원의 말이 저장되었습니다! 💪");
+    } catch (error: any) {
+      Alert.alert("오류", error.message || "각오/응원의 말 저장에 실패했습니다.");
+    }
+  };
+
+  const handleCancelResolution = () => {
+    Keyboard.dismiss();
+    setIsWritingResolution(false);
+    setResolutionText("");
+  };
+
+  const handleDeleteResolution = () => {
+    Alert.alert("삭제 확인", "정말로 각오/응원의 말을 삭제하시겠습니까?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteMyResolution();
+            setTodayResolution(null);
+            setIsResolutionExpanded(false);
+            setIsWritingResolution(false);
+            Alert.alert("성공", "각오/응원의 말이 삭제되었습니다.");
+          } catch (error: any) {
+            Alert.alert(
+              "오류",
+              error.message || "각오/응원의 말 삭제에 실패했습니다.",
+            );
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleResolutionClick = () => {
+    setIsResolutionExpanded(!isResolutionExpanded);
+  };
+
+  const handleEditResolution = () => {
+    setResolutionText(todayResolution || "");
+    setIsWritingResolution(true);
+    setIsResolutionExpanded(false);
+  };
+
+  const handleUpdateResolution = async () => {
+    if (!resolutionText.trim()) {
+      Alert.alert("알림", "다짐/응원의 말을 입력해주세요.");
+      return;
+    }
+
+    if (resolutionText.length > 100) {
+      Alert.alert("알림", "각오/응원의 말은 100자 이내로 작성해주세요.");
+      return;
+    }
+
+    try {
+      Keyboard.dismiss();
+      
+      console.log('🔥 각오/응원의 말 수정 시도:', { 
+        content: resolutionText.trim(), 
+        targetDate: currentDisplayDate
+      });
+      
+      await saveResolution(resolutionText.trim(), currentDisplayDate);
+      setTodayResolution(resolutionText.trim());
+      setIsWritingResolution(false);
+      setResolutionText("");
+      Alert.alert("성공", "각오/응원의 말이 수정되었습니다! 💪");
+    } catch (error: any) {
+      Alert.alert("오류", error.message || "각오/응원의 말 수정에 실패했습니다.");
+    }
+  };
+
+  /* 메모 관련 핸들러 (최적화) */
+  const handleAddMemo = useCallback((goalId: string) => {
+    console.log("🔘 기록 버튼 클릭됨 - handleAddMemo 호출", goalId);
+    const goal = goals.find((g) => g.id === goalId);
+    if (!goal) {
+      console.log("❌ 목표를 찾을 수 없음:", goalId);
+      return;
+    }
+
+    console.log("✅ 메모 모달 표시 중...", {
+      goalId,
+      goalTitle: goal.title,
+      existingMemo: goal.achievement_memo,
+    });
+
+    setSelectedGoalId(goalId);
+    setMemoText(goal.achievement_memo || "");
+    setMemoModalVisible(true);
+    
+    console.log("✅ 메모 모달 상태 업데이트 완료");
+  }, [goals]);
+
+  const handleSaveMemo = async () => {
+    if (!selectedGoalId) return;
+
+    try {
+      await addAchievementMemo(selectedGoalId, memoText.trim());
+      setMemoModalVisible(false);
+      setSelectedGoalId(null);
+      setMemoText("");
+      Alert.alert("성공", "수행 기록이 저장되었습니다!");
+    } catch (error: any) {
+      Alert.alert("오류", error.message || "기록 저장에 실패했습니다.");
+    }
+  };
+
+  const handleCancelMemo = () => {
+    setMemoModalVisible(false);
+    setSelectedGoalId(null);
+    setMemoText("");
+  };
+
+  /* 목표 체크 (최적화) */
+  const handleCheckGoal = useCallback(async (goalId: string) => {
+    const goal = goals.find((g) => g.id === goalId);
+    if (!goal) return;
+
+    // 기존 checkGoal 함수 호출 (뱃지 시스템은 goalStore에서 자동 처리됨)
+    await checkGoal(goalId);
+  }, [goals, checkGoal]);
+
+  /* ───── Header Component ───── */
+  const headerComponent = (
+    <>
+      {/* 상단 헤더 영역 - 흰색 배경 */}
+      <View style={styles.topHeaderSection}>
+        <View style={styles.topHeaderContent}>
+          {/* 왼쪽: 로고 + 날짜 */}
+          <View style={styles.leftHeaderSection}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require("../../assets/images/app-logo.png")}
+                style={styles.appLogoImage}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.dateText}>
+              {new Date().toLocaleDateString("ko-KR", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+              })}
+            </Text>
+          </View>
+
+          {/* 오른쪽: 유연한 목표 */}
+          <View style={styles.rightHeaderSection}>
+            {(() => {
+              console.log("🖥️ 자유 목표 위젯 렌더링:", {
+                currentFlexibleGoals: currentFlexibleGoals,
+                length: currentFlexibleGoals.length,
+                firstTitle: currentFlexibleGoals[0]?.title,
+                조건: currentFlexibleGoals.length > 0 ? "자유목표 표시" : "+ 버튼 표시"
+              });
+              return currentFlexibleGoals.length > 0 ? (
+                <TouchableOpacity
+                  style={styles.flexibleGoalWidget}
+                  onPress={() => {
+                    if (navigation) {
+                      navigation.navigate("FlexibleGoal", {
+                        targetDate: currentDisplayDate === getTodayKorea() ? "today" : "tomorrow",
+                      });
+                    }
+                  }}
+                >
+                  <Text style={styles.flexibleGoalPreview}>
+                    {currentFlexibleGoals[0]?.title || ""}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.flexibleGoalAddWidget}
+                  onPress={() => {
+                    if (navigation) {
+                      navigation.navigate("FlexibleGoal", {
+                        targetDate: currentDisplayDate === getTodayKorea() ? "today" : "tomorrow",
+                      });
+                    }
+                  }}
+                >
+                  <Text style={styles.flexibleGoalAddText}>
+                    '이건 꼭 한다!'하는 하나! +
+                  </Text>
+                </TouchableOpacity>
+              );
+            })()}
+          </View>
+        </View>
+
+        {/* 꿈 설정 카드 - 작게 */}
+        <View style={styles.dreamCardSmall}>
+          <Text
+            style={[
+              styles.dreamTextSmall,
+              {
+                fontSize: (() => {
+                  const dreamText = profile?.dream || "꿈이 무엇인가요?";
+                  const length = dreamText.length;
+
+                  // 더 세밀한 글자수 구간 설정으로 최적화
+                  if (length <= 15) return 14; // 1줄, 여유 있게
+                  if (length <= 30) return 13; // 1-2줄
+                  if (length <= 45) return 12; // 2줄
+                  if (length <= 65) return 11; // 2-3줄
+                  if (length <= 85) return 10; // 3줄
+                  if (length <= 110) return 9; // 3-4줄
+                  if (length <= 140) return 8; // 4-5줄
+                  return 7; // 5줄 이상 (200자까지 대응)
+                })(),
+                lineHeight: (() => {
+                  const dreamText = profile?.dream || "꿈이 무엇인가요?";
+                  const length = dreamText.length;
+
+                  // 글자 크기에 맞춘 줄 간격 조정
+                  if (length <= 15) return 16; // 14px + 2
+                  if (length <= 30) return 15; // 13px + 2
+                  if (length <= 45) return 14; // 12px + 2
+                  if (length <= 65) return 13; // 11px + 2
+                  if (length <= 85) return 12; // 10px + 2
+                  if (length <= 110) return 11; // 9px + 2
+                  if (length <= 140) return 10; // 8px + 2
+                  return 9; // 7px + 2
+                })(),
+              },
+            ]}
+            numberOfLines={undefined} // 여러 줄 허용
+          >
+            {profile?.dream || "꿈이 무엇인가요?"}
+          </Text>
+        </View>
+      </View>
+
+      {/* 각오/응원의 말 섹션 - 조건부 표시 */}
+      <View style={styles.resolutionAlwaysSection}>
+        <View style={styles.resolutionSectionContainer}>
+          {/* 오늘 실행할 각오/응원의 말이 있을 때 */}
+          {todayResolution && !isWritingResolution && (
+            <View style={styles.resolutionContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.myResolutionCard,
+                  { backgroundColor: "#2C2C2E" },
+                  isResolutionExpanded && styles.myResolutionCardExpanded
+                ]}
+                onPress={handleResolutionClick}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.myResolutionContent}>
+                  {todayResolution}
+                </Text>
+                
+                {/* 확장 상태일 때 수정/삭제 버튼 표시 (작성 당일에만) */}
+                {isResolutionExpanded && (() => {
+                  const { todayKey } = getCurrentDateKeys();
+                  const canEdit = currentDisplayDate !== todayKey; // D+1 로직: 내일 날짜로 저장되므로 오늘에만 수정 가능
+                  return canEdit ? (
+                    <View style={styles.myResolutionActions}>
+                      <TouchableOpacity
+                        style={styles.resolutionActionButton}
+                        onPress={handleEditResolution}
+                      >
+                        <Text style={styles.resolutionActionText}>수정</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.resolutionActionButton}
+                        onPress={handleDeleteResolution}
+                      >
+                        <Text style={[styles.resolutionActionText, { color: "#FF3B30" }]}>삭제</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null;
+                })()}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* 각오/응원의 말이 없을 때 새로 작성하는 버튼 */}
+          {!todayResolution && !isWritingResolution && (
+            <View style={styles.resolutionContainer}>
+              <TouchableOpacity
+                style={styles.resolutionWriteButton}
+                onPress={handleWriteResolution}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.resolutionWriteButtonText}>
+                  📝 각오/응원의 말을 작성해보세요
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* 편집 모드일 때 */}
+          {isWritingResolution && (
+            <View style={styles.resolutionContainer}>
+              <View style={styles.resolutionWriteSection}>
+                <TextInput
+                  style={styles.resolutionTextInput}
+                  value={resolutionText}
+                  onChangeText={setResolutionText}
+                  placeholder="내일을 위한 각오나 응원의 말을 적어보세요"
+                  placeholderTextColor="#8E8E93"
+                  multiline
+                  maxLength={100}
+                  autoFocus
+                />
+                <Text style={styles.resolutionCharCount}>
+                  {resolutionText.length}/100
+                </Text>
+                <View style={styles.resolutionWriteActions}>
+                  <TouchableOpacity
+                    style={styles.resolutionCancelButton}
+                    onPress={handleCancelResolution}
+                  >
+                    <Text style={styles.resolutionCancelButtonText}>취소</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.resolutionSaveButton}
+                    onPress={handleUpdateResolution}
+                  >
+                    <Text style={styles.resolutionSaveButtonText}>저장</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* 목표 섹션들 - 숨김 처리 */}
+
+
+      {/* 꿈 편집 모달 */}
+      {isEditingDream && (
+        <View style={styles.dreamEditModal}>
+          <View style={styles.dreamEditContent}>
+            <TextInput
+              style={styles.dreamInput}
+              value={dreamText}
+              onChangeText={setDreamText}
+              placeholder="당신의 꿈을 들려주세요!"
+              placeholderTextColor="#999"
+              multiline
+              maxLength={200}
+              autoFocus
+            />
+            <View style={styles.dreamButtonContainer}>
+              <TouchableOpacity
+                style={[styles.dreamButtonImproved, styles.dreamCancelButton]}
+                onPress={handleCancelDream}
+              >
+                <Text style={styles.dreamCancelButtonText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dreamButtonImproved, styles.dreamSaveButton]}
+                onPress={handleSaveDream}
+              >
+                <Text style={styles.dreamSaveButtonText}>저장</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+    </>
+  );
+
+  /* ───── Footer ───── */
+  const FooterButtons = () => (
+    <View style={styles.footerBox}>
+      {/* 중앙 플러스 버튼 */}
+      {!todayRetrospectExists && (
+        <View style={styles.centerPlusContainer}>
+          <TouchableOpacity
+            style={styles.plusButton}
+            onPress={() => {
+              // 즉시 시각적 피드백 제공
+              console.log("🔘 중앙 플러스 버튼 클릭 - 8:30PM 체크 포함 버전");
+
+              if (!navigation?.navigate) {
+                console.error("❌ navigation 오류");
+                return;
+              }
+
+              // 🚀 현재 표시된 목록의 날짜와 동일한 날짜로 목표 추가
+              try {
+                // currentDisplayDate와 오늘/내일 날짜 비교하여 정확한 initial 설정
+                const { todayKey, tomorrowKey } = getCurrentDateKeys();
+                
+                // 🔧 디버그: currentDisplayDate 상태 확인
+                console.log("🔧 currentDisplayDate 디버그:", {
+                  currentDisplayDate,
+                  currentDisplayDateType: typeof currentDisplayDate,
+                  currentDisplayDateLength: currentDisplayDate.length,
+                  todayKey,
+                  tomorrowKey,
+                  isEmpty: currentDisplayDate === "",
+                  상태: currentDisplayDate === "" ? "비어있음" : "설정됨"
+                });
+                
+                let initialMode: string;
+                
+                if (currentDisplayDate === todayKey) {
+                  initialMode = "today";
+                  console.log("✅ initialMode = 'today' 설정됨");
+                } else if (currentDisplayDate === tomorrowKey) {
+                  initialMode = "tomorrow";
+                  console.log("✅ initialMode = 'tomorrow' 설정됨");
+                } else {
+                  // 기본적으로 내일 모드 (안전한 선택)
+                  initialMode = "tomorrow";
+                  console.log("✅ initialMode = 'tomorrow' (기본값) 설정됨");
+                }
+                
+                console.log("🚀 목표 추가 - 상세 디버깅:", {
+                  currentDisplayDate,
+                  todayKey,
+                  tomorrowKey,
+                  todayMatches: currentDisplayDate === todayKey,
+                  tomorrowMatches: currentDisplayDate === tomorrowKey,
+                  initialMode: initialMode,
+                  로직: "currentDisplayDate 기반 정확한 모드 선택"
+                });
+
+                // ⏰ 8:30 PM 이후 체크 (오늘 목표 추가 시에만)
+                if (initialMode === "today") {
+                  const now = new Date();
+                  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+                  const nowKorea = new Date(utc + (9 * 3600000));
+                  const currentHour = nowKorea.getHours();
+                  const currentMinute = nowKorea.getMinutes();
+                  const currentTimeInMinutes = currentHour * 60 + currentMinute;
+                  const targetTimeInMinutes = 20 * 60 + 30; // 8:30 PM = 1230분
+
+                  console.log("⏰ 8:30 PM 체크 (수정됨):", {
+                    현재UTC: now.toISOString(),
+                    한국시간: nowKorea.toLocaleString("ko-KR"),
+                    currentHour,
+                    currentMinute,
+                    currentTime: `${currentHour}:${currentMinute.toString().padStart(2, '0')}`,
+                    currentTimeInMinutes,
+                    targetTime: "20:30",
+                    targetTimeInMinutes,
+                    isAfter830PM: currentTimeInMinutes >= targetTimeInMinutes
+                  });
+
+                  if (currentTimeInMinutes >= targetTimeInMinutes) {
+                    Alert.alert(
+                      "⏰ 늦은 시간 목표 추가",
+                      "오후 8:30 이후에는 \n\n추가 목록을 설정하실 수 없습니다.",
+                      [
+                        { 
+                          text: "확인", 
+                          style: "cancel" 
+                        },
+                      ]
+                    );
+                    return; // 알림 표시 후 함수 종료
+                  }
+                }
+                
+                console.log("🚀 navigation.navigate 호출 직전:", { initial: initialMode });
+                navigation.navigate("TimeSelect", { initial: initialMode });
+                console.log("🚀 navigation.navigate 호출 완료");
+              } catch (error) {
+                console.error("❌ navigate 호출 중 오류:", error);
+              }
+            }}
+          >
+            <Ionicons name="add" size={56} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* 모든 목표 완료 시 회고 작성 버튼 */}
+      {allDoneToday && !todayRetrospectExists && (
+        <TouchableOpacity
+          style={styles.retrospectCompactButtonStyled}
+          onPress={() => {
+            console.log("🔘 회고 버튼 클릭 - navigation 상태:", {
+              navigation: !!navigation,
+              navigate: !!navigation?.navigate,
+            });
+
+            if (!navigation) {
+              console.error("❌ 회고 버튼: navigation이 null입니다!");
+              return;
+            }
+
+            if (!navigation.navigate) {
+              console.error(
+                "❌ 회고 버튼: navigation.navigate가 존재하지 않습니다!",
+              );
+              return;
+            }
+
+            try {
+              console.log("🚀 Retrospect로 이동");
+              navigation.navigate("Retrospect");
+            } catch (error) {
+              console.error("❌ 회고 버튼 navigate 호출 중 오류:", error);
+            }
+          }}
+        >
+          <Text style={styles.retrospectCompactButtonText}>📝 회고 작성</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* 회고 작성 후: 예정 목표 작성 */}
+      {todayRetrospectExists && (
+        <View style={styles.centerPlusContainer}>
+          <TouchableOpacity
+            style={styles.plusButton}
+            onPress={() => {
+              console.log("🔘 예정 목표 플러스 버튼 클릭 - navigation 상태:", {
+                navigation: !!navigation,
+                navigate: !!navigation?.navigate,
+              });
+
+              // 내일 목표가 5개 미만이면 일괄 등록, 5개 이상이면 개별 추가
+              const tomorrowGoals = allGoalsWithCheck.filter((x) => {
+                const goalDate = new Date(x.goal.target_time);
+                const koreanDate = new Date(
+                  goalDate.getTime() + 9 * 60 * 60 * 1000,
+                );
+                const { tomorrowKey: currentTomorrowKey } =
+                  getCurrentDateKeys();
+                return (
+                  koreanDate.toISOString().slice(0, 10) === currentTomorrowKey
+                );
+              });
+
+              if (!navigation) {
+                console.error("❌ 예정 목표 버튼: navigation이 null입니다!");
+                return;
+              }
+
+              if (!navigation.navigate) {
+                console.error(
+                  "❌ 예정 목표 버튼: navigation.navigate가 존재하지 않습니다!",
+                );
+                return;
+              }
+
+              try {
+                if (tomorrowGoals.length < 5) {
+                  console.log("🚀 예정 목표 - GoalBatch로 이동");
+                  navigation.navigate("GoalBatch", { initial: "tomorrow" });
+                } else {
+                  console.log("🚀 예정 목표 - TimeSelect로 이동");
+                  navigation.navigate("TimeSelect", { initial: "tomorrow" });
+                }
+              } catch (error) {
+                console.error(
+                  "❌ 예정 목표 버튼 navigate 호출 중 오류:",
+                  error,
+                );
+              }
+            }}
+          >
+            <Ionicons name="add" size={56} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  /* ───── Row ───── */
+  const renderItem = ({
+    item,
+  }: {
+    item: { goal: Goal; canCheck: boolean; canEdit: boolean };
+  }) => {
+    const t = new Date(item.goal.target_time)
+      .toLocaleTimeString("ko-KR", {
+        hour12: true,
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+      .replace("AM", "오전")
+      .replace("PM", "오후");
+
+    let indicator = null;
+    if (item.goal.status === "success") {
+      // 연승 뱃지 데이터 가져오기 (Map에서 올바르게 접근)
+      const goalId = item.goal.id;
+      const goalBadge = goalBadges.get(goalId);
+
+      console.log("🏆 뱃지 확인:", {
+        goalId,
+        goalBadge,
+        hasGoalBadge: !!goalBadge,
+        goalBadgesSize: goalBadges.size,
+      });
+
+      // goalBadge가 있으면 실제 이미지 사용
+      let badgeImage = null;
+      if (goalBadge) {
+        badgeImage = getBadgeImage(goalBadge.category, goalBadge.level);
+        console.log("🖼️ 뱃지 이미지:", {
+          category: goalBadge.category,
+          level: goalBadge.level,
+          hasImage: !!badgeImage,
+          badgeImage,
+        });
+      }
+
+      indicator = (
+        <View style={[styles.statusBadge, styles.successBadge]}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {badgeImage && (
+              <Image
+                source={badgeImage}
+                style={{ width: 16, height: 16, marginRight: 4 }}
+                resizeMode="contain"
+              />
+            )}
+            <Text style={styles.statusText}>승리</Text>
+          </View>
+        </View>
+      );
+    } else if (item.goal.status === "failure")
+      indicator = (
+        <View style={[styles.statusBadge, styles.failureBadge]}>
+          <Text style={styles.statusText}>🥹 패배</Text>
+        </View>
+      );
+    else
+      indicator = (
+        <TouchableOpacity
+          disabled={!item.canCheck}
+          onPress={() => checkGoal(item.goal.id)}
+          style={[
+            styles.checkButton,
+            item.canCheck
+              ? styles.checkButtonActive
+              : styles.checkButtonInactive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.checkButtonText,
+              item.canCheck ? { color: "#fff" } : { color: "#999" },
+            ]}
+          >
+            {item.canCheck ? "확인" : "대기"}
+          </Text>
+        </TouchableOpacity>
+      );
+
+    return (
+      <View style={styles.item}>
+        {/* 제목·시간 */}
+        <View style={styles.titleTimeContainer}>
+          <Text style={styles.title}>{item.goal.title}</Text>
+          <Text style={styles.time}>{t}</Text>
+        </View>
+
+        {/* 수정 + 상태 */}
+        <View style={styles.actions}>
+          {item.canEdit && (
+            <>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => {
+                  console.log("🔘 수정 버튼 클릭 - navigation 상태:", {
+                    navigation: !!navigation,
+                    navigate: !!navigation?.navigate,
+                    goalId: item.goal.id,
+                  });
+
+                  if (!navigation) {
+                    console.error("❌ 수정 버튼: navigation이 null입니다!");
+                    return;
+                  }
+
+                  if (!navigation.navigate) {
+                    console.error(
+                      "❌ 수정 버튼: navigation.navigate가 존재하지 않습니다!",
+                    );
+                    return;
+                  }
+
+                  try {
+                    console.log("🚀 GoalDetail로 이동, goalId:", item.goal.id);
+                    navigation.navigate("GoalDetail", { goalId: item.goal.id });
+                  } catch (error) {
+                    console.error("❌ 수정 버튼 navigate 호출 중 오류:", error);
+                  }
+                }}
+              >
+                <Text style={styles.editButtonText}>수정</Text>
+              </TouchableOpacity>
+              <View style={{ width: 8 }} />
+            </>
+          )}
+          {indicator}
+
+          {/* 승리한 목표에만 "단일 수행 기록" 버튼 표시 */}
+          {item.goal.status === "success" && (
+            <>
+              <View style={{ width: 8 }} />
+              <TouchableOpacity
+                style={styles.memoButton}
+                onPress={() => {
+                  console.log("🔘 기록 버튼 터치됨!", item.goal.id);
+                  handleAddMemo(item.goal.id);
+                  console.log("🔘 handleAddMemo 호출 완료");
+                }}
+              >
+                <Text style={styles.memoButtonText}>📝 기록</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const renderSectionHeader = ({
+    section,
+  }: {
+    section: SectionListData<
+      { goal: Goal; canCheck: boolean; canEdit: boolean },
+      GoalSection
+    >;
+  }) => (
+    <View>
+      {/* "오늘" 또는 "수행 예정 목록" 섹션에서는 검은색 영역에 제목과 각오/응원의 말 통합 */}
+      {(section.title === "" ||
+        section.title === "수행 목록" ||
+        section.title === "수행 예정 목록") && (
+        <View style={styles.todaySection}>
+          {/* 수행 목록 제목 */}
+          <Text style={styles.todaySectionTitle}>
+            {section.title === "수행 예정 목록"
+              ? "수행 예정 목록"
+              : "수행 목록"}
+          </Text>
+        </View>
+      )}
+
+      {/* 일반 섹션 헤더 (내일/커뮤니티 제외) */}
+      {section.title !== "예정" &&
+        section.title !== "커뮤니티" &&
+        section.title !== "" &&
+        section.title !== "수행 목록" &&
+        section.title !== "수행 예정 목록" && (
+          <View style={styles.upcomingSection}>
+            <Text style={styles.upcomingSectionTitle}>{section.title}</Text>
+          </View>
+        )}
+    </View>
+  );
+
+  /* ───── 렌더 ───── */
+  return (
+    <View style={{ flex: 1, backgroundColor: "#1C1C1E" }}>
+      <StatusBar barStyle="light-content" backgroundColor="#1C1C1E" />
+      <View style={{ paddingTop: insets.top }} />
+      <SectionList
+        style={{ flex: 1, backgroundColor: "#1C1C1E" }}
+        sections={sections}
+        keyExtractor={(item) => item.goal.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#fff"
+          />
+        }
+        renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
+        ListHeaderComponent={headerComponent}
+        ListFooterComponent={FooterButtons}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyTitle}>행복할 그날을 향해!!</Text>
+            <Text style={styles.emptySubtitle}>
+              매일 5가지 이상의 성취를 쌓아갑시다!
+            </Text>
+            <Text style={styles.emptyHint}>
+              "+" 버튼을 눌러 수행 목록을 추가해보세요
+            </Text>
+          </View>
+        )}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        contentContainerStyle={{ paddingBottom: 32 }}
+      />
+
+      {/* 간단한 수행 기록 모달 */}
+      <Modal
+        visible={showDayRecordModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDayRecordModal(false)}
+      >
+        <View style={styles.recordModalOverlay}>
+          <View style={styles.recordModalContent}>
+            <View style={styles.recordModalHeader}>
+              <Text style={styles.recordModalTitle}>📝상세 수행 기록</Text>
+              <TouchableOpacity
+                onPress={() => setShowDayRecordModal(false)}
+                style={styles.recordModalCloseButton}
+              >
+                <Text style={styles.recordModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.recordModalTextInput}
+              placeholder="오늘 하루를 기록해주세요..."
+              placeholderTextColor="#999"
+              value={retrospectText}
+              onChangeText={setRetrospectText}
+              multiline
+              maxLength={200}
+              numberOfLines={4}
+            />
+
+            <View style={styles.recordModalButtons}>
+              <TouchableOpacity
+                style={styles.recordModalCancelButton}
+                onPress={() => setShowDayRecordModal(false)}
+              >
+                <Text style={styles.recordModalCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.recordModalSaveButton}
+                onPress={async () => {
+                  if (retrospectText.trim().length === 0) {
+                    Alert.alert("알림", "회고 내용을 입력해주세요.");
+                    return;
+                  }
+                  
+                  try {
+                    const { todayKey } = getCurrentDateKeys();
+                    await saveRetrospect(retrospectText.trim());
+                    setShowDayRecordModal(false);
+                    setRetrospectText("");
+                    Alert.alert("저장 완료", "오늘의 기록이 저장되었습니다!");
+                    
+                    // 회고 상태 새로고침
+                    await fetchToday();
+                  } catch (error) {
+                    console.error("회고 저장 실패:", error);
+                    Alert.alert("오류", "기록 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
+                  }
+                }}
+              >
+                <Text style={styles.recordModalSaveText}>저장</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 메모 모달 */}
+      <Modal
+        visible={memoModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleCancelMemo}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>📝 상세 수행 기록</Text>
+            <Text style={styles.modalSubtitle}>
+              {selectedGoalId
+                ? goals.find((g) => g.id === selectedGoalId)?.title
+                : ""}
+            </Text>
+
+            <TextInput
+              style={styles.memoInput}
+              placeholder="화이팅! ❣️"
+              placeholderTextColor="#999"
+              value={memoText}
+              onChangeText={setMemoText}
+              multiline
+              maxLength={200}
+              textAlignVertical="top"
+            />
+
+            <Text style={styles.memoCharCount}>{memoText.length}/200</Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelModalButton]}
+                onPress={handleCancelMemo}
+              >
+                <Text style={styles.cancelModalButtonText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveModalButton]}
+                onPress={handleSaveMemo}
+              >
+                <Text style={styles.saveModalButtonText}>저장</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+/* ───── 스타일 ───── */
+const styles = StyleSheet.create({
+  // 상단 헤더 섹션 (흰색 배경) - SafeArea 적용
+  topHeaderSection: {
+    backgroundColor: "#FFFFFF",
+    paddingTop: 20, // SafeAreaView 내부에서는 추가 패딩 최소화
+    paddingHorizontal: 8,
+    paddingBottom: 20,
+    borderRadius: 10,
+  },
+
+  topHeaderContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 15,
+  },
+
+  leftHeaderSection: {
+    alignItems: "flex-start",
+  },
+
+  logoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 5,
+  },
+  appLogoImage: {
+    width: 120,
+    height: 30,
+  },
+  logoEmoji: {
+    fontSize: 20,
+    marginRight: 4,
+  },
+  logoText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
+
+  dateText: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+    marginLeft: 20,
+  },
+
+  rightHeaderSection: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+
+  flexibleGoalWidget: {
+    backgroundColor: "#FFF2E6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    minWidth: 100,
+    maxWidth: 140,
+  },
+
+  flexibleGoalTitle: {
+    fontSize: 11,
+    color: "#B8860B",
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+
+  flexibleGoalPreview: {
+    fontSize: 10,
+    color: "#B8860B",
+    textAlign: "center",
+  },
+
+  flexibleGoalAddWidget: {
+    backgroundColor: "#F0F0F0",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+
+  flexibleGoalAddText: {
+    fontSize: 12,
+    color: "#999",
+    fontWeight: "500",
+  },
+
+  dreamCardSmall: {
+    backgroundColor: "#F8F8F8",
+    borderRadius: 10,
+    marginTop: 10,
+    marginLeft: 10,
+    marginRight: 10,
+    paddingHorizontal: 12, // 가로 패딩 약간 줄임
+    paddingVertical: 8, // 세로 패딩 줄여서 텍스트 공간 확보
+    justifyContent: "center",
+    alignItems: "flex-start", // 왼쪽 정렬을 위해 변경
+    minHeight: 60,
+    maxHeight: 60, // 박스 크기 고정
+  },
+
+  dreamTextSmall: {
+    fontSize: 14, // 기본 폰트 크기 (동적으로 조정됨)
+    color: "#666",
+    lineHeight: 16, // 기본 줄 간격 (동적으로 조정됨)
+    textAlign: "left", // 왼쪽 정렬로 변경
+    width: "100%",
+  },
+
+  // 각오/응원의 말 섹션 - 항상 표시되는 독립 영역
+  resolutionAlwaysSection: {
+    backgroundColor: "#1C1C1E",
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    marginBottom: 5,
+  },
+
+  // 각오/응원의 말 섹션 컨테이너 - 적절한 패딩 적용
+  resolutionSectionContainer: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    marginBottom: 0,
+  },
+
+  resolutionWriteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    backgroundColor: "#2C2C2E",
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#4A4A4C",
+    borderStyle: "dashed",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  resolutionWriteButtonText: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+
+  myResolutionCard: {
+    backgroundColor: "#2C2C2E",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#3A3A3C",
+    minHeight: 70,
+    maxHeight: 70,
+    justifyContent: "center",
+  },
+
+  myResolutionCardExpanded: {
+    minHeight: 150,
+    maxHeight: 250,
+    paddingBottom: 24,
+  },
+
+  myResolutionLabel: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+
+  myResolutionActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 12,
+    gap: 12,
+  },
+
+  resolutionActionButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  resolutionActionText: {
+    fontSize: 13,
+    color: "#007AFF",
+    fontWeight: "500",
+  },
+
+  myResolutionContent: {
+    fontSize: 13,
+    color: "#FFFFFF",
+    lineHeight: 16,
+    fontWeight: "500",
+    textAlignVertical: "center",
+    flex: 1,
+  },
+
+  resolutionEditButton: {
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+    alignSelf: "flex-end",
+  },
+
+  resolutionEditButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  resolutionWriteSection: {
+    backgroundColor: "#2C2C2E",
+    borderRadius: 12,
+    padding: 16,
+  },
+
+  resolutionTextInput: {
+    backgroundColor: "#3A3A3C",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 15,
+    color: "#FFFFFF",
+    minHeight: 80,
+    maxHeight: 120,
+    textAlignVertical: "top",
+    marginBottom: 8,
+  },
+
+  resolutionCharCount: {
+    fontSize: 12,
+    color: "#8E8E93",
+    textAlign: "right",
+    marginBottom: 12,
+  },
+
+  resolutionWriteActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+
+  resolutionCancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#3A3A3C",
+  },
+
+  resolutionCancelButtonText: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontWeight: "500",
+  },
+
+  resolutionSaveButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#007AFF",
+  },
+
+  resolutionSaveButtonText: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+
+  // 회고 작성 버튼 스타일
+  retrospectWriteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 15,
+    backgroundColor: "#34C759",
+    borderRadius: 12,
+    marginTop: 30,
+    borderWidth: 2,
+    borderColor: "#30D158",
+  },
+
+  retrospectWriteButtonText: {
+    fontSize: 15,
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+
+  // 컴팩트 회고 작성 버튼 (하단)
+
+  // 간단한 수행 기록 모달 스타일
+  recordModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  recordModalContent: {
+    backgroundColor: "#2C2C2E",
+    borderRadius: 16,
+    padding: 20,
+    width: "90%",
+    maxWidth: 400,
+  },
+  recordModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  recordModalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  recordModalCloseButton: {
+    padding: 4,
+  },
+  recordModalCloseText: {
+    fontSize: 20,
+    color: "#8E8E93",
+    fontWeight: "500",
+  },
+  recordModalTextInput: {
+    backgroundColor: "#3A3A3C",
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: "#FFFFFF",
+    minHeight: 120,
+    textAlignVertical: "top",
+    marginBottom: 16,
+  },
+  recordModalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  recordModalCancelButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: "#3A3A3C",
+  },
+  recordModalCancelText: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    fontWeight: "500",
+  },
+  recordModalSaveButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: "#007AFF",
+  },
+  recordModalSaveText: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+
+  dreamEditModal: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+
+  dreamEditContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 25,
+    width: "95%",
+    maxWidth: 380,
+  },
+
+  headerBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  // headerBox 전용으로 이동
+
+  dateTxt: {
+    fontWeight: "700",
+    fontSize: 14,
+    color: "#666",
+  },
+  dreamTxt: {
+    color: "#666",
+    marginTop: 4,
+    fontSize: 14,
+  },
+  dreamEditHint: {
+    color: "#999",
+    fontSize: 12,
+    marginTop: 1,
+  },
+  summaryTxt: {
+    color: "#999",
+    fontSize: 12,
+    marginTop: 4,
+  },
+
+  // 꿈 편집 스타일
+  dreamContainer: {
+    marginTop: 4,
+    alignItems: "flex-end",
+  },
+  dreamEditContainer: {
+    marginTop: 4,
+    width: "100%",
+    maxWidth: 250,
+  },
+  dreamInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 14,
+    backgroundColor: "#FFFFFF",
+    color: "#333",
+    minHeight: 40,
+    maxHeight: 80,
+    textAlignVertical: "top",
+  },
+  dreamButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 8,
+    gap: 8,
+  },
+
+  saveButton: {
+    backgroundColor: "#7BA428",
+  },
+  cancelButton: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#007AFF",
+  },
+  saveButtonText: {
+    color: "#007AFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  cancelButtonText: {
+    color: "#007AFF",
+    fontSize: 14,
+  },
+
+  // 오늘 섹션 - 검은색 영역에 제목과 각오/응원의 말 통합
+  todaySection: {
+    backgroundColor: "#1C1C1E",
+    paddingHorizontal: 20,
+    paddingTop: 5,
+    paddingBottom: 10,
+  },
+
+  todaySectionTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginBottom: 15,
+  },
+
+  // 예정 섹션
+  upcomingSection: {
+    backgroundColor: "#1C1C1E",
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 16,
+  },
+
+  upcomingSectionTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginBottom: 8,
+  },
+
+  // 각오/응원의 말 관련 스타일 - 개선된 디자인
+  resolutionContainer: {
+    marginTop: 4,
+  },
+
+  // 유연한 목표 관련 스타일
+  flexibleGoalSection: {
+    backgroundColor: "#fff3cd",
+    padding: 16,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ffeaa7",
+  },
+  flexibleGoalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  flexibleGoalSectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#856404",
+  },
+  flexibleGoalDetailButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  flexibleGoalDetailText: {
+    fontSize: 12,
+    color: "#007AFF",
+  },
+  flexibleGoalAddButton: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#ffeaa7",
+    borderStyle: "dashed",
+    alignItems: "center",
+  },
+  flexibleGoalAddButtonText: {
+    fontSize: 14,
+    color: "#856404",
+    fontWeight: "500",
+  },
+  flexibleGoalAddButtonDesc: {
+    fontSize: 12,
+    color: "#6c757d",
+    marginTop: 2,
+  },
+  flexibleGoalList: {
+    gap: 8,
+  },
+  flexibleGoalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#ffeaa7",
+  },
+  flexibleGoalIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  flexibleGoalContent: {
+    flex: 1,
+  },
+  flexibleGoalText: {
+    fontSize: 14,
+    color: "#333",
+    marginBottom: 2,
+  },
+  flexibleGoalCompleted: {
+    textDecorationLine: "line-through",
+    color: "#666",
+  },
+  flexibleGoalType: {
+    fontSize: 12,
+    color: "#856404",
+  },
+  flexibleGoalStatus: {
+    fontSize: 18,
+    marginLeft: 8,
+  },
+
+  footerBox: {
+    marginTop: 8,
+    alignItems: "center",
+  },
+  footerBtn: {
+    width: "90%",
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "#007AFF",
+    alignItems: "center",
+  },
+  footerTxt: {
+    fontSize: 14,
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  footerTxtDisabled: {
+    color: "#007AFF",
+  },
+
+  sectionHeaderContainer: {
+    backgroundColor: "#007AFF",
+  },
+  sectionHeader: {
+    padding: 8,
+    fontWeight: "700",
+    color: "#007AFF",
+    fontSize: 14,
+  },
+  item: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 15,
+    marginVertical: 8,
+    borderRadius: 8,
+    shadowColor: "#007AFF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  titleTimeContainer: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  title: {
+    fontSize: 18,
+    color: "#007AFF",
+    fontWeight: "500",
+    marginBottom: 12,
+  },
+  time: {
+    color: "#007AFF",
+    fontSize: 8,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "transparent",
+  },
+
+  // 상태 표시 스타일
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 70,
+    alignItems: "center",
+  },
+  successBadge: {
+    backgroundColor: "#75bbd9",
+  },
+  failureBadge: {
+    backgroundColor: "#FF9800",
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  checkButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 70,
+    alignItems: "center",
+  },
+  checkButtonActive: {
+    backgroundColor: "#D4AF37",
+  },
+  checkButtonInactive: {
+    backgroundColor: "#C8C8D0",
+  },
+  checkButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#333333",
+  },
+  editButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  editButtonText: {
+    fontSize: 12,
+    color: "#7BA428",
+    fontWeight: "500",
+  },
+
+  // 메모 버튼 스타일
+  memoButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#E6F3FF",
+    borderWidth: 1,
+    borderColor: "#7BA428",
+  },
+  memoButtonText: {
+    fontSize: 11,
+    color: "#7BA428",
+    fontWeight: "600",
+  },
+
+  // 메모 모달 스타일
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#2C2C2E",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    width: "100%",
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#CCCCCC",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  memoInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    backgroundColor: "#fff",
+    minHeight: 100,
+    maxHeight: 200,
+    textAlignVertical: "top",
+    marginBottom: 8,
+  },
+  memoCharCount: {
+    fontSize: 12,
+    color: "#AAAAAA",
+    textAlign: "right",
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelModalButton: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  saveModalButton: {
+    backgroundColor: "#007AFF",
+  },
+  cancelModalButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  saveModalButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  // 빈 상태 스타일
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 64,
+  },
+
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+
+  emptySubtitle: {
+    fontSize: 16,
+    color: "#B3B3B3",
+    textAlign: "center",
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+
+  emptyHint: {
+    fontSize: 14,
+    color: "#8A8A8A",
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+
+  // 플러스 버튼 개선
+  centerPlusContainer: {
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 15,
+  },
+
+  plusButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#556B2F",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#556B2F",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  // 회고 버튼 개선
+  retrospectCompactButtonStyled: {
+    paddingVertical: 20,
+    paddingHorizontal: 40,
+    borderRadius: 28,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+
+  retrospectCompactButtonText: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+
+  // 꿈 편집 버튼들 개선
+  dreamButtonImproved: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    flex: 1,
+    marginHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  dreamSaveButton: {
+    backgroundColor: "#556B2F",
+  },
+
+  dreamSaveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+
+  dreamCancelButton: {
+    backgroundColor: "#F8F8F8",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+
+  dreamCancelButtonText: {
+    color: "#666666",
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+
+  dreamButtonContainerDuplicate: {
+    flexDirection: "row",
+    marginTop: 16,
+    paddingHorizontal: 12,
+  },
+
+  // 각오/응원의 말 작성 액션 버튼들 개선
+  resolutionWriteActionsDuplicate: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+    gap: 12,
+  },
+
+  resolutionCancelButtonStyled: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: "#2C2C2E",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#4A4A4C",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  resolutionCancelButtonTextStyled: {
+    color: "#CCCCCC",
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+
+  resolutionSaveButtonStyled: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: "#556B2F",
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#556B2F",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
+  resolutionSaveButtonTextStyled: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+
+  // 각오/응원의 말 안내 문구 스타일
+  resolutionGuideContainer: {
+    backgroundColor: "#1A1A1C",
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    marginVertical: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#3A3A3C",
+  },
+
+  resolutionGuideText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 6,
+    letterSpacing: 0.3,
+  },
+
+  resolutionGuideSubText: {
+    fontSize: 13,
+    fontWeight: "400",
+    color: "#9B9B9D",
+    textAlign: "center",
+    lineHeight: 18,
+    letterSpacing: 0.2,
+  },
+});
