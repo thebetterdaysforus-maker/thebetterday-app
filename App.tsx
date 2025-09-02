@@ -1,7 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState, useRef, ErrorInfo } from 'react';
-import { View, Text, StyleSheet, Alert, TextInput, Platform, Image, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Alert, TextInput, Platform, Image, SafeAreaView, TouchableOpacity, AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // Expo 알림 시스템 비활성화됨
@@ -115,31 +115,7 @@ function MainApp() {
         console.log('전역 변수 설정 건너뜀 (정상)');
       }
       
-      // 알림 확인 함수 전역 등록 - 웹/모바일 모두 지원 (APK 안전 처리)
-      const checkNotifications = async () => {
-        console.log('🔍 현재 예약된 알림 확인 시작');
-        
-        try {
-          // dynamic import 제거하고 일반 import 사용
-          console.log('🔍 알림 확인 기능은 개발 중입니다.');
-        } catch (error) {
-          console.error('❌ 알림 확인 실패:', error);
-        }
-      };
-      
-      // 모든 알림 삭제 함수 (APK 안전 처리)  
-      const clearAllNotifications = async () => {
-        console.log('🧹 모든 알림 삭제 시작');
-        
-        try {
-          // dynamic import 제거하고 일반 import 사용
-          const Notifications = require('expo-notifications');
-          await Notifications.cancelAllScheduledNotificationsAsync();
-          console.log('✅ 모든 스케줄된 알림 삭제 완료');
-        } catch (error) {
-          console.error('❌ 알림 삭제 실패:', error);
-        }
-      };
+      // 🔕 알림 시스템 비활성화됨 - 관련 전역 함수들 제거
       
       // 첫 실행 플래그 초기화 함수 (개발용)
       const resetFirstLaunchFlag = async () => {
@@ -167,21 +143,15 @@ function MainApp() {
       // 전역 함수로 안전하게 등록
       try {
         if (typeof window !== 'undefined') {
-          (window as any).checkNotifications = checkNotifications;
-          (window as any).clearAllNotifications = clearAllNotifications;
           (window as any).createMissingBadges = createMissingBadges;
           (window as any).resetFirstLaunchFlag = resetFirstLaunchFlag;
         } else if (typeof global !== 'undefined') {
-          (global as any).checkNotifications = checkNotifications;
-          (global as any).clearAllNotifications = clearAllNotifications;
           (global as any).createMissingBadges = createMissingBadges;
           (global as any).resetFirstLaunchFlag = resetFirstLaunchFlag;
         }
         
         console.log('🔧 디버깅용 함수 등록 완료');
         console.log('💡 사용 가능한 함수:');
-        console.log('  - checkNotifications() : 예약된 알림 확인');
-        console.log('  - clearAllNotifications() : 모든 알림 삭제');
         console.log('  - createMissingBadges() : 완료된 목표의 뱃지 생성');
         console.log('  - resetFirstLaunchFlag() : 첫 실행 플래그 초기화 (Welcome 화면 테스트용)');
       } catch (e) {
@@ -242,8 +212,10 @@ function MainApp() {
           console.warn('⚠️ 기본 네트워크 연결 실패 감지');
         }
         
-        // 알림 시스템 비활성화 (Expo Go SDK 53 제한)
-        if (__DEV__) console.log("🔕 알림 시스템 비활성화됨 (SDK 53 제한)");
+        // 🔕 알림 시스템 비활성화됨 (APK 최적화)
+        if (__DEV__) {
+          console.log("🔕 알림 시스템 비활성화됨 - 모듈 제거로 인한 최적화");
+        }
         
         // 시간대 설정 초기화 (APK 안전 처리)
         try {
@@ -431,7 +403,63 @@ function MainApp() {
     }
   }, [session, fetchProfile]);
 
+  // 📱 앱 상태 변화 감지 및 백그라운드 복귀 시 동기화 재시작
+  useEffect(() => {
+    if (!session) return; // 세션이 없으면 동기화 불필요
 
+    const handleAppStateChange = async (nextAppState: string) => {
+      console.log(`📱 앱 상태 변화: ${AppState.currentState} → ${nextAppState}`);
+
+      if (nextAppState === 'active' && AppState.currentState !== 'active') {
+        console.log('🔥 앱 포그라운드 복귀 - 동기화 재시작');
+        
+        try {
+          console.log('🔥 앱 포그라운드 복귀 - ⚡ 병렬 동기화 시작');
+          
+          // ⚡ 병렬 처리: 실시간 구독 재연결 + 데이터 동기화 동시 실행
+          const tasks = [
+            // 1. 실시간 구독 재연결 (항상 실행)
+            (async () => {
+              console.log('🔴 실시간 구독 재연결 중...');
+              const { realtimeManager } = await import('./src/utils/realtimeManager');
+              await realtimeManager.startRealtimeSubscriptions(session.user.id);
+              console.log('✅ 실시간 구독 재연결 완료');
+            })()
+          ];
+          
+          // 2. 데이터 동기화 (익명 사용자 제외)
+          if (!session.user.is_anonymous) {
+            tasks.push(
+              (async () => {
+                console.log('🔄 앱 복귀 데이터 동기화 중...');
+                const { masterDataManager } = await import('./src/store/masterDataManager');
+                const success = await masterDataManager.syncAllData();
+                if (success) {
+                  console.log('✅ 앱 복귀 동기화 완료');
+                  // 프로필 상태도 새로고침
+                  fetchProfile();
+                } else {
+                  console.log('⚠️ 앱 복귀 동기화 일부 실패');
+                }
+              })()
+            );
+          }
+          
+          // ⚡ 모든 작업을 병렬로 실행 (최대 속도)
+          await Promise.all(tasks);
+          console.log('🎯 앱 복귀 병렬 동기화 완료 - 총 처리 시간 단축!');
+        } catch (error) {
+          console.error('❌ 앱 복귀 동기화 실패:', error);
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      subscription?.remove();
+    };
+  }, [session, fetchProfile]);
 
   // 스플래시 스크린 비활성화됨
 
@@ -465,30 +493,86 @@ function MainApp() {
         <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 32, lineHeight: 24, color: '#333' }}>
           {initError}
         </Text>
+        {/* 🔄 자동 재시도 버튼 */}
         <TouchableOpacity
           style={{
-            backgroundColor: '#6366f1',
+            backgroundColor: '#10b981',
+            paddingHorizontal: 32,
+            paddingVertical: 16,
+            borderRadius: 8,
+            minWidth: 200,
+            marginBottom: 12
+          }}
+          onPress={async () => {
+            console.log('🔄 자동 재시도 시작...');
+            setLoading(true);
+            setInitError('');
+            
+            // 🚨 ProfileSetupScreen 이동 방지: session/profile 초기화
+            setSession(null); // 완전 초기화 - AuthStack으로 이동
+            
+            let retryCount = 0;
+            const maxRetries = 3;
+            
+            while (retryCount < maxRetries) {
+              try {
+                console.log(`🔄 재시도 ${retryCount + 1}/${maxRetries}...`);
+                await new Promise(resolve => setTimeout(resolve, 500)); // ⚡ 0.5초 대기 (고속)
+                
+                // Supabase 연결 테스트
+                const { data } = await supabase.from('profiles').select('count').limit(1);
+                console.log('✅ Supabase 연결 성공!');
+                
+                setLoading(false);
+                return; // 성공 시 종료
+              } catch (error) {
+                retryCount++;
+                console.log(`❌ 재시도 ${retryCount} 실패:`, error);
+                
+                if (retryCount >= maxRetries) {
+                  setLoading(false);
+                  setInitError('서버 연결에 계속 실패합니다. 네트워크 상태를 확인하거나 앱을 종료해주세요.');
+                }
+              }
+            }
+          }}
+        >
+          <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold', textAlign: 'center' }}>
+            🔄 자동 재시도 (3회)
+          </Text>
+        </TouchableOpacity>
+        
+        {/* 🚪 앱 종료 버튼 */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#ef4444',
             paddingHorizontal: 32,
             paddingVertical: 16,
             borderRadius: 8,
             minWidth: 200
           }}
-          onPress={async () => {
-            // 앱 재시작
-            setLoading(true);
-            setInitError('');
-            // initializeAuth 함수를 다시 실행
-            await new Promise(resolve => setTimeout(resolve, 100));
-            if (typeof window !== 'undefined' && window.location?.reload) {
-              window.location.reload();
-            } else {
-              setLoading(false);
-              Alert.alert('재시도', '앱을 수동으로 재시작해주세요.');
-            }
+          onPress={() => {
+            Alert.alert(
+              '앱 종료',
+              '정말로 앱을 종료하시겠습니까?',
+              [
+                { text: '취소', style: 'cancel' },
+                {
+                  text: '종료',
+                  style: 'destructive',
+                  onPress: () => {
+                    console.log('🚪 사용자가 앱 종료를 선택했습니다.');
+                    if (typeof window !== 'undefined' && window.close) {
+                      window.close();
+                    }
+                  }
+                }
+              ]
+            );
           }}
         >
           <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold', textAlign: 'center' }}>
-            다시 시도
+            🚪 앱 종료
           </Text>
         </TouchableOpacity>
       </SafeAreaView>
