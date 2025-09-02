@@ -1,0 +1,431 @@
+// src/screens/TimeSelectScreen.tsx
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
+import React, { useState } from "react";
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import useGoalStore from "../store/goalStore";
+import CustomTimePicker from "../components/CustomTimePicker";
+
+/* ────── 날짜 헬퍼 ────── */
+const nearestFutureHalfHour = (): Date => {
+  // 🔥 안정적인 한국 시간 계산 (UTC 오프셋 방식)
+  const now = new Date();
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const koreaTime = new Date(utcTime + (9 * 60 * 60 * 1000));
+  
+  // 30분 후 계산
+  koreaTime.setMinutes(koreaTime.getMinutes() + 30);
+  const m = koreaTime.getMinutes();
+  const rounded = m < 30 ? 30 : 60;
+  if (rounded === 60) koreaTime.setHours(koreaTime.getHours() + 1);
+  koreaTime.setMinutes(rounded % 60, 0, 0);
+  
+  console.log("📅 nearestFutureHalfHour 계산 (수정됨):", {
+    UTC시간: now.toISOString(),
+    한국시간현재: koreaTime.toLocaleString('ko-KR'),
+    계산결과날짜: koreaTime.toISOString().slice(0, 10),
+    계산결과시간: koreaTime.toLocaleString('ko-KR')
+  });
+  
+  return koreaTime;
+};
+const tomorrowStart = (): Date => {
+  // 🔥 안정적인 한국 시간 계산 (UTC 오프셋 방식)
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const koreaTime = new Date(utc + (9 * 60 * 60 * 1000));
+  
+  const tomorrow = new Date(koreaTime);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0); // 오전 9시 시작
+  
+  console.log('🇰🇷 D+1 내일 시작 (수정됨):', {
+    UTC시간: now.toISOString(),
+    현재한국: koreaTime.toLocaleString('ko-KR'),
+    내일시작: tomorrow.toLocaleString('ko-KR'),
+    내일날짜: tomorrow.toISOString().slice(0, 10)
+  });
+  
+  return tomorrow;
+};
+const tomorrowEnd = (): Date => {
+  const d = tomorrowStart();
+  d.setHours(23, 30, 0, 0);
+  return d;
+};
+
+export default function TimeSelectScreen({ navigation, route }: any) {
+  const insets = useSafeAreaInsets();
+  
+  /* 오늘 vs 내일 모드 - 기본값은 "today"로 당일 추가 모드 */
+  const isTomorrow = route.params?.initial === "tomorrow";
+  const isToday = route.params?.initial === "today";
+  
+  console.log("🔍 TimeSelectScreen 파라미터 확인:", {
+    routeParams: route.params,
+    initial: route.params?.initial,
+    isTomorrow,
+    isToday
+  });
+
+  /* 시간 재설정 모드 체크 */
+  const isTimeReset = route.params?.currentTime;
+  const goalId = route.params?.goalId;
+
+  /* 기본값 - 시간 재설정 시 현재 시간 + 1분 사용 */
+  const base = isTimeReset
+    ? (() => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + 1); // 현재 시간 + 1분
+        now.setSeconds(0, 0); // 초와 밀리초 제거
+        return now;
+      })()
+    : isTomorrow
+      ? tomorrowStart()
+      : nearestFutureHalfHour();
+  const [targetTime, setTargetTime] = useState<Date>(base);
+  const [isTimeValid, setIsTimeValid] = useState<boolean>(true);
+
+  /* 목표 스토어 - 중복 체크용 */
+  const { goals, fetchGoals } = useGoalStore();
+
+  // 화면 로드 시 한 번만 목표 데이터 조회 
+  React.useEffect(() => {
+    console.log('🔄 TimeSelectScreen에서 수행 목록 데이터 강제 조회');
+    fetchGoals().catch(console.error);
+  }, []); // fetchGoals 의존성 제거로 무한 루프 방지
+
+  /* 피커 변경 → 자유로운 분 단위 선택 */
+  const onChange = (_: DateTimePickerEvent, date?: Date) => {
+    if (!date) return;
+
+    // 내일 모드일 때는 날짜를 내일로 고정
+    if (isTomorrow) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      date.setFullYear(tomorrow.getFullYear());
+      date.setMonth(tomorrow.getMonth());
+      date.setDate(tomorrow.getDate());
+    }
+
+    // 초와 밀리초는 0으로 설정
+    date.setSeconds(0, 0);
+    setTargetTime(date);
+  };
+
+  /* GoalDetail 이동 전 중복 체크 및 시간 제한 체크 */
+  const goNext = () => {
+    // 시간 유효성 체크 - CustomTimePicker에서 검증된 상태 확인
+    if (!isTimeValid) {
+      console.log('⚠️ 유효하지 않은 시간으로 저장 시도 차단');
+      return; // 저장 시도 자체를 차단
+    }
+    const selectedTimeISO = targetTime.toISOString();
+    // APK 환경에서 한국 시간 강제 적용
+    const now = new Date();
+    const koreaOffset = 9 * 60; // UTC+9
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const koreaTime = new Date(utc + (koreaOffset * 60000));
+
+    // 00:00:00 시간 자동 수정 (Date value out of bounds 방지)
+    if (targetTime.getHours() === 0 && targetTime.getMinutes() === 0) {
+      const correctedTime = new Date(targetTime);
+      correctedTime.setMinutes(30); // 00:30으로 자동 수정
+      setTargetTime(correctedTime);
+      console.log('🔧 00:00:00 시간을 00:30:00으로 자동 수정');
+      return;
+    }
+
+    // 시간 제한 체크 - 내일 모드와 시간 재설정 모드에서는 제약 없음
+    // 편집 모드와 내일 목표에서는 시간 제약 건너뜀
+    console.log("🕐 TimeSelectScreen 시간 제약 검사:", {
+      isTomorrow,
+      isTimeReset,
+      현재시간: now.toLocaleString('ko-KR'),
+      한국시간: koreaTime.toLocaleString('ko-KR'),
+      수행시간: targetTime.toLocaleString('ko-KR'),
+      제약건너뜀: isTomorrow || isTimeReset
+    });
+    
+    if (!isTomorrow && !isTimeReset) {
+      // 🌙 8:30 PM 이후 당일 목표 설정 어려움 알림 (오늘만) - 한국시간 기준
+      const currentHour = koreaTime.getHours();
+      const currentMinute = koreaTime.getMinutes();
+      
+      // 8:30 PM 체크는 GoalListScreen에서 처리됨 (중복 제거)
+      
+      // 🌙 23:30 이후 당일 목표 설정 완전 제한 체크 (오늘만) - 한국시간 기준
+      if (currentHour === 23 && currentMinute >= 30) {
+        console.log("❌ 23:30 이후 당일 목표 설정 제한 위반");
+        Alert.alert(
+          '당일 목표 설정 마감',
+          '오후 11시 30분 이후에는 당일 목표를 설정할 수 없습니다.\n\n내일 목표로 설정해 주세요.'
+        );
+        return;
+      }
+      
+      // 🔥 오늘 목표만 3시간 제한 적용 - 한국시간 기준
+      const minAllowedTime = new Date(koreaTime.getTime() + 3 * 60 * 60 * 1000);
+      if (targetTime <= minAllowedTime) {
+        console.log("❌ 당일 수행 목록 작성 3시간 제한 위반 - 알림 표시");
+        Alert.alert(
+          '수행 목록 설정 시간 제한', 
+          '새 수행 목록은 현재 시간으로부터 최소 3시간 이후에 설정할 수 있습니다.\n\n' +
+          `현재 시간: ${koreaTime.toLocaleTimeString('ko-KR', { hour12: true, hour: '2-digit', minute: '2-digit' }).replace('AM', '오전').replace('PM', '오후')}\n` +
+          `설정 가능한 시간: ${minAllowedTime.toLocaleTimeString('ko-KR', { hour12: true, hour: '2-digit', minute: '2-digit' }).replace('AM', '오전').replace('PM', '오후')} 이후`
+        );
+        return;
+      }
+    } else {
+      console.log("✅ 내일 목표 또는 편집 모드 - 시간 제약 건너뜀");
+    }
+
+    // ±30분 범위 충돌 체크 - 시간 재설정 모드에서는 본인 목표 제외
+    const selectedTime = targetTime.getTime();
+    
+    console.log("🔍 TimeSelectScreen 충돌 검사:", {
+      selectedTime: targetTime.toLocaleTimeString('ko-KR'),
+      selectedTimeISO: targetTime.toISOString(),
+      isTimeReset,
+      goalId,
+      existingGoalsCount: (goals || []).length,
+      existingGoals: (goals || []).map(g => ({
+        id: g.id,
+        time: new Date(g.target_time).toLocaleTimeString('ko-KR'),
+        timeISO: g.target_time
+      }))
+    });
+    
+    // 같은 날짜의 목표들만 필터링 (정확한 날짜 비교)
+    const selectedDateLocal = targetTime.toLocaleDateString();
+    const sameDayGoals = (goals || []).filter(g => {
+      const goalDate = new Date(g.target_time);
+      const goalDateLocal = goalDate.toLocaleDateString();
+      const isSameDate = goalDateLocal === selectedDateLocal;
+      
+      console.log("📅 개별 수행 목록 날짜 비교:", {
+        수행: g.title,
+        수행시간: g.target_time,
+        수행날짜로컬: goalDateLocal,
+        선택날짜로컬: selectedDateLocal,
+        같은날짜: isSameDate
+      });
+      
+      return isSameDate;
+    });
+
+    console.log("📅 TimeSelectScreen 최종 같은 날짜 필터링:", {
+      selectedDate: selectedDateLocal,
+      selectedTime: targetTime.toLocaleString(),
+      totalGoals: (goals || []).length,
+      sameDayGoals: sameDayGoals.length,
+      sameDayGoalsList: sameDayGoals.map(g => ({
+        title: g.title,
+        time: new Date(g.target_time).toLocaleTimeString('ko-KR')
+      }))
+    });
+
+    // 🔥 APK 정확한 30분 충돌 방지 시스템
+    const conflictingGoals = sameDayGoals.filter((g) => {
+      // 편집 모드에서는 자기 자신 제외
+      if (isTimeReset && g.id === goalId) return false;
+
+      const goalMs = new Date(g.target_time).getTime();
+      const targetMs = targetTime.getTime();
+      const diffMs = Math.abs(targetMs - goalMs);
+      const THIRTY_MIN = 30 * 60 * 1000;
+
+      const isConflict = diffMs < THIRTY_MIN;
+
+      console.log("⏰ 30분 충돌 검사:", {
+        기존: g.title,
+        기존시간: new Date(g.target_time).toLocaleTimeString('ko-KR'),
+        새시간: targetTime.toLocaleTimeString('ko-KR'),
+        차이분: Math.round(diffMs / 60000),
+        충돌: isConflict
+      });
+
+      return isConflict;
+    });
+
+    // 실제 충돌이 있을 때만 알림 표시하고 저장 차단
+    if (conflictingGoals.length > 0) {
+      const conflictInfo = conflictingGoals.map(g => 
+        `- ${g.title} (${new Date(g.target_time).toLocaleTimeString('ko-KR', { 
+          hour12: true, hour: '2-digit', minute: '2-digit' 
+        }).replace('AM', '오전').replace('PM', '오후')})`
+      ).join('\n');
+      
+      console.log("🚫 실제 30분 충돌 감지 - 저장 차단:", conflictingGoals.length + "개");
+      
+      Alert.alert(
+        '시간 중복',
+        `선택한 시간과 30분 이내로 가까운 목록이 존재합니다.:\n\n${conflictInfo}\n\n다른 시간을 선택해주세요.`
+      );
+      return; // 여기서 저장 차단
+    }
+
+    console.log("✅ 30분 충돌 없음 - 저장 진행");
+
+    // 시간 재설정 모드인 경우 원래 날짜를 보존하면서 시간만 변경
+    if (isTimeReset) {
+      console.log('🔄 시간 재설정 모드 - 원래 날짜 보존하여 시간 변경');
+      
+      // 기존 목표의 날짜를 가져와서 새로운 시간과 결합
+      const existingGoal = goals.find(g => g.id === goalId);
+      if (existingGoal) {
+        const existingDate = new Date(existingGoal.target_time);
+        const newDateTime = new Date(targetTime);
+        
+        // 기존 날짜에 새로운 시간 적용
+        existingDate.setHours(newDateTime.getHours(), newDateTime.getMinutes(), 0, 0);
+        const preservedDateTime = existingDate.toISOString();
+        
+        console.log('📅 날짜 보존 처리:', {
+          기존시간: existingGoal.target_time,
+          선택시간: targetTime.toISOString(),
+          보존결과: preservedDateTime
+        });
+        
+        navigation.navigate("GoalDetail", {
+          goalId: goalId,
+          prefilledTime: preservedDateTime,
+          updatedTime: preservedDateTime,
+          batch: route.params?.batch ?? false,
+        });
+      } else {
+        // 기존 목표를 찾을 수 없는 경우 선택한 시간 그대로 사용
+        navigation.navigate("GoalDetail", {
+          goalId: goalId,
+          prefilledTime: selectedTimeISO,
+          updatedTime: selectedTimeISO,
+          batch: route.params?.batch ?? false,
+        });
+      }
+    } else {
+      // 수행 목록 추가 모드
+      navigation.navigate("GoalDetail", {
+        goalId: null,
+        prefilledTime: selectedTimeISO,
+        batch: route.params?.batch ?? false,
+      });
+    }
+  };
+
+  return (
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 44) }]}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Text style={styles.backButtonText}>← 수행 목록</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>시간 선택</Text>
+      </View>
+
+      {/* 시간 선택 컨테이너 */}
+      <View style={styles.timePickerContainer}>
+        <CustomTimePicker
+          value={targetTime}
+          onChange={(date) => setTargetTime(date)}
+          onValidityChange={setIsTimeValid}
+          isTomorrowMode={isTomorrow}
+          goals={goals || []}
+          conflictingTimes={[]} // TimeSelectScreen에서는 DB 목표만 체크
+          excludeGoalId={isTimeReset ? goalId : undefined}
+        />
+      </View>
+
+      {/* 다음 버튼 */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[
+            styles.nextButton,
+            !isTimeValid && styles.nextButtonDisabled
+          ]}
+          onPress={goNext}
+          disabled={!isTimeValid}
+        >
+          <Text style={[
+            styles.nextButtonText,
+            !isTimeValid && styles.nextButtonTextDisabled
+          ]}>
+            다음
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+/* ────── 스타일 ────── */
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    paddingTop: 44, // SafeArea 고려
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    backgroundColor: "#ffffff",
+    position: "relative",
+  },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#000000",
+    textAlign: "center",
+  },
+  timePickerContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    backgroundColor: "#f8f9fa",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 40,
+    paddingBottom: 60,
+    backgroundColor: "#f8f9fa",
+  },
+  nextButton: {
+    backgroundColor: "#007AFF",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    minWidth: 120,
+  },
+  nextButtonDisabled: {
+    backgroundColor: "#cccccc",
+  },
+  nextButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#ffffff",
+  },
+  nextButtonTextDisabled: {
+    color: "#999999",
+  },
+});
