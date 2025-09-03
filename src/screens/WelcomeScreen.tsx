@@ -1,3 +1,4 @@
+// src/screens/WelcomeScreen.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -10,7 +11,7 @@ import {
   ActivityIndicator,
   ImageBackground,
 } from "react-native";
-import { useAuthStore } from "../store/authStore";
+import { useAuthStore } from "../store/authStore"; // ✅ Supabase OAuth 함수 사용
 
 interface WelcomeScreenProps {
   navigation: any;
@@ -18,14 +19,16 @@ interface WelcomeScreenProps {
 
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { signInWithGoogle, backupGuestSession, restoreGuestSession } = useAuthStore();
+  const { signInWithGoogle, backupGuestSession, restoreGuestSession } =
+    useAuthStore();
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      // 기존 게스트 세션이 있다면 백업
+      // 게스트 세션 백업
       await backupGuestSession();
-      
+
+      // Supabase OAuth 로그인 실행
       const result = await signInWithGoogle();
 
       if (result.success) {
@@ -35,23 +38,17 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
           navigation.navigate("Main");
         }
       } else {
-        // Google 로그인 실패 시 게스트 세션 복원
-        console.log('❌ Google 로그인 실패 - 게스트 세션 복원 시도');
+        console.log("❌ Google 로그인 실패 - 게스트 세션 복원");
         await restoreGuestSession();
-        
         Alert.alert(
           "Google 로그인 실패",
           result.error || "로그인 중 오류가 발생했습니다.",
-          [{ text: "확인" }],
         );
       }
     } catch (error) {
-      console.log('❌ Google 로그인 오류 - 게스트 세션 복원 시도');
+      console.log("❌ Google 로그인 중 오류 발생 - 게스트 세션 복원");
       await restoreGuestSession();
-      
-      Alert.alert("Google 로그인 오류", "예상치 못한 오류가 발생했습니다.", [
-        { text: "확인" },
-      ]);
+      Alert.alert("Google 로그인 오류", "예상치 못한 오류가 발생했습니다.");
     } finally {
       setIsGoogleLoading(false);
     }
@@ -64,7 +61,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
       resizeMode="cover"
     >
       <SafeAreaView style={styles.container}>
-        {/* 왼쪽 상단 로고와 텍스트 */}
+        {/* 상단 로고 & 문구 */}
         <View style={styles.topSection}>
           <Image
             source={require("../../assets/images/app-logo.png")}
@@ -76,7 +73,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
           </Text>
         </View>
 
-        {/* 하단 로그인 버튼들 */}
+        {/* 하단 버튼 */}
         <View style={styles.bottomSection}>
           {/* Google 로그인 */}
           <TouchableOpacity
@@ -94,15 +91,13 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
             )}
           </TouchableOpacity>
 
-          {/* 게스트 모드로 시작하기 */}
+          {/* 게스트 모드 */}
           <TouchableOpacity
             style={[styles.loginButton, styles.guestButton]}
             onPress={() => navigation.navigate("GuestMode")}
           >
             <Text style={styles.guestButtonText}>게스트 모드로 시작하기</Text>
           </TouchableOpacity>
-
-
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>
@@ -121,7 +116,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)", // 텍스트 가독성을 위한 오버레이
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
   },
   topSection: {
     flex: 1,
@@ -140,10 +135,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     lineHeight: 26,
     paddingLeft: 10,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   bottomSection: {
     paddingHorizontal: 40,
@@ -187,7 +182,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
   },
-
   footer: {
     alignItems: "center",
   },

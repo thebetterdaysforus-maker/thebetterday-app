@@ -1,10 +1,11 @@
 // src/store/authStore.ts
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { supabase, supabaseUrl } from '../supabaseClient';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import { Platform } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { supabase } from "../supabaseClient";
+import * as WebBrowser from "expo-web-browser";
+import { makeRedirectUri } from "expo-auth-session";
+
+WebBrowser.maybeCompleteAuthSession();
 
 interface AuthState {
   isAutoLoginEnabled: boolean;
@@ -12,466 +13,230 @@ interface AuthState {
   disableAutoLogin: () => Promise<void>;
   checkAutoLogin: () => Promise<boolean>;
   performAutoLogin: () => Promise<boolean>;
-  signInWithGoogle: () => Promise<{ success: boolean; error?: string; isNewUser?: boolean }>;
+  signInWithGoogle: () => Promise<{
+    success: boolean;
+    error?: string;
+    isNewUser?: boolean;
+  }>; // ✅ 추가
   signInAsGuest: () => Promise<{ success: boolean; error?: string }>;
-  // 게스트 세션 백업/복원 기능
   backupGuestSession: () => Promise<void>;
   restoreGuestSession: () => Promise<boolean>;
   clearGuestBackup: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   isAutoLoginEnabled: true,
 
   enableAutoLogin: async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
-        await AsyncStorage.setItem('auto_login', 'true');
-        await AsyncStorage.setItem('user_session', JSON.stringify(session));
+        await AsyncStorage.setItem("auto_login", "true");
+        await AsyncStorage.setItem("user_session", JSON.stringify(session));
         set({ isAutoLoginEnabled: true });
-        // 자동 로그인 활성화됨
       }
     } catch (error) {
-      if (__DEV__) console.error('자동 로그인 활성화 실패:', error);
+      if (__DEV__) console.error("자동 로그인 활성화 실패:", error);
     }
   },
 
   disableAutoLogin: async () => {
     try {
-      await AsyncStorage.removeItem('auto_login');
-      await AsyncStorage.removeItem('user_session');
+      await AsyncStorage.removeItem("auto_login");
+      await AsyncStorage.removeItem("user_session");
       set({ isAutoLoginEnabled: false });
-      // 자동 로그인 비활성화됨
     } catch (error) {
-      if (__DEV__) console.error('자동 로그인 비활성화 실패:', error);
+      if (__DEV__) console.error("자동 로그인 비활성화 실패:", error);
     }
   },
 
   checkAutoLogin: async () => {
     try {
-      const autoLogin = await AsyncStorage.getItem('auto_login');
-      const enabled = autoLogin !== 'false'; // 기본값을 true로 설정
+      const autoLogin = await AsyncStorage.getItem("auto_login");
+      const enabled = autoLogin !== "false";
       set({ isAutoLoginEnabled: enabled });
       return enabled;
     } catch (error) {
-      console.error('자동 로그인 확인 실패:', error);
-      return true; // 오류 시에도 기본값을 true로
+      console.error("자동 로그인 확인 실패:", error);
+      return true;
     }
   },
 
   performAutoLogin: async () => {
     try {
-      // 자동 로그인 프로세스 시작
-      
-      // 자동 로그인이 비활성화되어 있으면 바로 false 반환
-      const autoLogin = await AsyncStorage.getItem('auto_login');
-      // 자동 로그인 설정 확인됨
-      
-      if (autoLogin === 'false') {
-        // 자동 로그인이 비활성화됨
-        return false;
-      }
+      const autoLogin = await AsyncStorage.getItem("auto_login");
+      if (autoLogin === "false") return false;
 
-      // 게스트 세션 먼저 확인
-      const guestSession = await AsyncStorage.getItem('guest_session');
-      if (guestSession) {
-        try {
-          const session = JSON.parse(guestSession);
-          console.log('🎭 Guest session found - validating');
-          
-          if (session?.user?.is_anonymous && session?.access_token && session?.refresh_token) {
-            console.log('🎭 게스트 세션 복원 시도...');
-            
-            // Supabase에 게스트 세션 설정
-            const { data: sessionData, error: setSessionError } = await supabase.auth.setSession({
-              access_token: session.access_token,
-              refresh_token: session.refresh_token
-            });
-            
-            if (!setSessionError && sessionData?.session) {
-              console.log('✅ Guest session restored successfully');
-              
-              // 게스트 프로필이 존재하는지 확인
-              const { data: guestProfile, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', sessionData.session.user.id)
-                .single();
+      const savedSession = await AsyncStorage.getItem("user_session");
+      if (!savedSession) return false;
 
-              if (profileError || !guestProfile) {
-                console.log('🎭 게스트 프로필 없음 - ProfileSetup으로 이동');
-              } else {
-                console.log('🎭 기존 게스트 프로필 확인됨');
-              }
-              
-              return true;
-            } else {
-              console.log('⚠️ 게스트 세션 복원 실패:', setSessionError?.message);
-              console.log('🗑️ 만료된 게스트 세션 삭제');
-              await AsyncStorage.removeItem('guest_session');
-            }
-          } else {
-            console.log('⚠️ 잘못된 게스트 세션 형식 또는 토큰 누락');
-            await AsyncStorage.removeItem('guest_session');
-          }
-        } catch (error) {
-          console.error('❌ 게스트 세션 파싱 오류:', error);
-          await AsyncStorage.removeItem('guest_session');
-        }
-      } else {
-        console.log('📝 게스트 세션 없음');
-      }
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
+      if (currentSession) return true;
 
-      // 저장된 일반 세션 확인
-      const savedSession = await AsyncStorage.getItem('user_session');
-      console.log('🔍 저장된 세션:', savedSession ? '있음' : '없음');
-      
-      if (!savedSession) {
-        console.log('❌ 저장된 세션 없음');
-        return false;
-      }
+      try {
+        const parsedSession = JSON.parse(savedSession);
+        const { data, error } = await supabase.auth.setSession({
+          access_token: parsedSession.access_token,
+          refresh_token: parsedSession.refresh_token,
+        });
 
-      // 현재 세션 확인
-      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-      console.log('🔍 현재 Supabase 세션:', currentSession ? '있음' : '없음');
-      
-      if (error) {
-        console.log('❌ 세션 확인 오류:', error.message);
-        return false;
-      }
-      
-      if (!currentSession) {
-        // 저장된 세션으로 복원 시도
-        try {
-          const parsedSession = JSON.parse(savedSession);
-          console.log('🔄 저장된 세션으로 복원 시도...');
-          
-          // 메모리 누수 방지를 위한 타임아웃 ID 관리
-          let timeoutId: any;
-          
-          const sessionPromise = supabase.auth.setSession({
-            access_token: parsedSession.access_token,
-            refresh_token: parsedSession.refresh_token
-          });
-          
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            timeoutId = setTimeout(() => reject(new Error('세션 복원 타임아웃')), 5000);
-          });
-          
-          try {
-            const sessionResult = await Promise.race([sessionPromise, timeoutPromise]);
-            if (timeoutId) clearTimeout(timeoutId); // 메모리 누수 방지
-            
-            const { data, error: setError } = sessionResult;
-            
-            if (setError) {
-              console.log('❌ 세션 복원 실패:', setError.message);
-              // 실패한 세션 정보 삭제
-              await AsyncStorage.removeItem('user_session');
-              return false;
-            }
-            
-            console.log('✅ 세션 복원 성공');
-            return true;
-          } catch (raceError) {
-            if (timeoutId) clearTimeout(timeoutId); // 에러 시에도 타임아웃 정리
-            throw raceError;
-          }
-        } catch (parseError) {
-          console.log('❌ 세션 파싱/복원 오류:', parseError);
-          // 손상된 세션 정보 삭제
-          await AsyncStorage.removeItem('user_session');
-          await AsyncStorage.removeItem('auto_login');
+        if (error || !data?.session) {
+          await AsyncStorage.removeItem("user_session");
           return false;
         }
+        return true;
+      } catch (err) {
+        await AsyncStorage.removeItem("user_session");
+        await AsyncStorage.removeItem("auto_login");
+        return false;
       }
-
-      console.log('✅ 자동 로그인 성공 - 현재 세션 유효');
-      return true;
     } catch (error) {
-      console.error('❌ 자동 로그인 실패:', error);
+      console.error("❌ 자동 로그인 실패:", error);
       return false;
     }
   },
 
+  // ✅ Google OAuth 로그인 (추가)
   signInWithGoogle: async () => {
     try {
-      console.log('🔄 Google 로그인 시작...');
-      
-      // Supabase OAuth 사용 (APK 배포 대응)
-      const redirectUrl = Platform.OS === 'android' 
-        ? 'com.thebetterday.app://oauth' // APK 배포 시
-        : undefined; // Expo Go 개발 시
-        
+      // Expo Go → https://auth.expo.io/..., APK → com.thebetterday.app://oauth
+      const redirectTo = makeRedirectUri({
+        scheme: "com.thebetterday.app",
+        path: "oauth",
+      });
+
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
-          redirectTo: redirectUrl,
+          redirectTo,
           queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
+            access_type: "offline",
+            prompt: "consent",
           },
         },
       });
 
-      if (error) {
-        console.error('❌ OAuth URL 생성 실패:', error);
-        return { success: false, error: error.message };
+      if (error || !data?.url) {
+        return {
+          success: false,
+          error: error?.message || "OAuth URL 생성 실패",
+        };
       }
 
-      if (!data?.url) {
-        console.error('❌ OAuth URL이 없습니다');
-        return { success: false, error: 'OAuth URL 생성 실패' };
-      }
-
-      console.log('🌐 Google OAuth initialized');
-      
-      // URL 분석
-      try {
-        const urlObj = new URL(data.url);
-        console.log('🔍 OAuth parameters configured');
-        console.log('- OAuth parameters configured');
-      } catch (e) {
-        console.log('OAuth configuration validated');
-      }
-
-      // 웹 브라우저에서 Google OAuth 열기 (APK/Expo Go 대응)
-      const browserRedirectUrl = Platform.OS === 'android' 
-        ? 'com.thebetterday.app://oauth' // APK 배포 시
-        : undefined; // Expo Go 개발 시
-        
       const result = await WebBrowser.openAuthSessionAsync(
         data.url,
-        browserRedirectUrl
+        redirectTo,
       );
 
-      if (result.type === 'cancel') {
-        console.log('🚫 사용자가 Google 로그인을 취소했습니다');
-        return { success: false, error: '로그인이 취소되었습니다' };
+      if (result.type !== "success") {
+        return { success: false, error: "Google 로그인 취소 또는 실패" };
       }
 
-      if (result.type !== 'success') {
-        console.error('❌ Google 로그인 실패:', result);
-        return { success: false, error: 'Google 로그인에 실패했습니다' };
-      }
+      // Supabase 세션 확인 (최대 20초 재시도)
+      for (let i = 0; i < 40; i++) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) {
+          const session = sessionData.session;
 
-      console.log('✅ Google OAuth callback received');
+          // 프로필 유무 확인
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("user_id", session.user.id)
+            .maybeSingle();
 
-      // URL에서 세션 정보 추출 시도
-      const callbackUrl = result.url;
-      console.log('🔍 Processing authentication callback');
-      
-      // Supabase 세션 자동 처리 대기 (더 긴 시간)
-      let attempts = 0;
-      const maxAttempts = 40; // 20초로 증가
-      
-      while (attempts < maxAttempts) {
-        try {
-          // 세션 새로고침 시도
-          const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
-          
-          if (!sessionError && sessionData?.session) {
-            console.log('✅ 세션 새로고침으로 Google 로그인 확인됨');
-            const session = sessionData.session;
-            
-            // 프로필 처리
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', session.user.id)
-              .single();
+          const isNewUser = !profile;
 
-            const isNewUser = !profile || !!profileError;
-            console.log('👤 사용자 상태:', isNewUser ? '신규 사용자' : '기존 사용자');
+          await AsyncStorage.setItem("auto_login", "true");
+          await AsyncStorage.setItem("user_session", JSON.stringify(session));
 
-            if (isNewUser && session.user) {
-              const user = session.user;
-              const { error: createError } = await supabase
-                .from('profiles')
-                .insert({
-                  user_id: user.id,
-                  email: user.email,
-                  display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '사용자',
-                  google_id: user.user_metadata?.sub,
-                  profile_picture_url: user.user_metadata?.avatar_url,
-                  created_at: new Date().toISOString(),
-                });
-
-              if (createError) {
-                console.error('❌ 프로필 생성 실패:', createError);
-              } else {
-                console.log('✅ Google 사용자 프로필 생성 완료');
-              }
-            }
-
-            await AsyncStorage.setItem('auto_login', 'true');
-            await AsyncStorage.setItem('user_session', JSON.stringify(session));
-
-            return { 
-              success: true, 
-              isNewUser: Boolean(isNewUser)
-            };
-          }
-          
-          // 일반 세션 확인
-          const { data: session } = await supabase.auth.getSession();
-          if (session?.session) {
-            console.log('✅ 일반 세션으로 Google 로그인 확인됨');
-            
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', session.session.user.id)
-              .single();
-
-            const isNewUser = !profile || !!profileError;
-            console.log('👤 사용자 상태:', isNewUser ? '신규 사용자' : '기존 사용자');
-
-            if (isNewUser && session.session.user) {
-              const user = session.session.user;
-              const { error: createError } = await supabase
-                .from('profiles')
-                .insert({
-                  user_id: user.id,
-                  email: user.email,
-                  display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || '사용자',
-                  google_id: user.user_metadata?.sub,
-                  profile_picture_url: user.user_metadata?.avatar_url,
-                  created_at: new Date().toISOString(),
-                });
-
-              if (createError) {
-                console.error('❌ 프로필 생성 실패:', createError);
-              } else {
-                console.log('✅ Google 사용자 프로필 생성 완료');
-              }
-            }
-
-            await AsyncStorage.setItem('auto_login', 'true');
-            await AsyncStorage.setItem('user_session', JSON.stringify(session.session));
-
-            return { 
-              success: true, 
-              isNewUser: Boolean(isNewUser)
-            };
-          }
-        } catch (error) {
-          console.log('🔄 세션 확인 재시도...', attempts + 1);
+          return { success: true, isNewUser };
         }
-        
-        attempts++;
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((r) => setTimeout(r, 500));
       }
 
-      console.log('⚠️ Expo Go 환경에서는 Google 로그인 제한이 있을 수 있습니다');
-      console.log('📱 실제 배포 시에는 정상 작동합니다');
-      return { success: false, error: 'Expo Go 환경에서는 OAuth 세션 처리에 제한이 있습니다' };
-
-    } catch (error) {
-      console.error('❌ Google 로그인 오류:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Google 로그인 중 오류가 발생했습니다' 
-      };
+      return { success: false, error: "세션을 확인하지 못했습니다" };
+    } catch (e: any) {
+      console.error("❌ Google 로그인 오류:", e);
+      return { success: false, error: e.message || "Google 로그인 중 오류" };
     }
   },
 
   signInAsGuest: async () => {
     try {
-      console.log('🚀 게스트 로그인 시작...');
-      
-      // 기존 게스트 세션 확인
-      const { data: { session: existingSession } } = await supabase.auth.getSession();
-      
-      if (existingSession?.user?.is_anonymous) {
-        console.log('✅ 기존 게스트 세션 유지');
-        await AsyncStorage.setItem('guest_session', JSON.stringify(existingSession));
-        return { success: true };
-      }
-      
-      // 새로운 익명 로그인
+      console.log("🚀 게스트 로그인 시작...");
       const { data, error } = await supabase.auth.signInAnonymously();
-      
-      if (error) {
-        console.error('❌ 게스트 로그인 실패:', error.message);
-        return { success: false, error: error.message };
+
+      if (error || !data.session) {
+        return {
+          success: false,
+          error: error?.message || "게스트 세션 생성 실패",
+        };
       }
-      
-      if (data.session) {
-        console.log('✅ 게스트 로그인 성공');
-        
-        // 게스트 세션을 AsyncStorage에 저장하여 지속성 확보
-        await AsyncStorage.setItem('guest_session', JSON.stringify(data.session));
-        console.log('💾 게스트 세션 저장 완료');
-        
-        // 게스트 프로필은 ProfileSetup 화면에서 생성하도록 변경
-        console.log('🎭 게스트 모드: ProfileSetup으로 이동 예정');
-        
-        // 게스트도 자동 로그인 활성화
-        await AsyncStorage.setItem('auto_login', 'true');
-        await AsyncStorage.setItem('user_session', JSON.stringify(data.session));
-        console.log('✅ 게스트 자동 로그인 활성화');
-        
-        return { success: true };
-      }
-      
-      return { success: false, error: '게스트 세션 생성 실패' };
+
+      await AsyncStorage.setItem("guest_session", JSON.stringify(data.session));
+      await AsyncStorage.setItem("auto_login", "true");
+      await AsyncStorage.setItem("user_session", JSON.stringify(data.session));
+
+      return { success: true };
     } catch (error) {
-      console.error('❌ 게스트 로그인 오류:', error);
-      return { success: false, error: '게스트 로그인 중 오류가 발생했습니다.' };
+      console.error("❌ 게스트 로그인 오류:", error);
+      return { success: false, error: "게스트 로그인 중 오류가 발생했습니다." };
     }
   },
 
-  // 게스트 세션 백업/복원 기능
   backupGuestSession: async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session?.user?.is_anonymous) {
-        console.log('💾 게스트 세션 백업 중...');
-        await AsyncStorage.setItem('guest_session_backup', JSON.stringify(session));
-        console.log('✅ 게스트 세션 백업 완료');
+        await AsyncStorage.setItem(
+          "guest_session_backup",
+          JSON.stringify(session),
+        );
       }
     } catch (error) {
-      console.error('❌ 게스트 세션 백업 실패:', error);
+      console.error("❌ 게스트 세션 백업 실패:", error);
     }
   },
 
   restoreGuestSession: async () => {
     try {
-      const backupSession = await AsyncStorage.getItem('guest_session_backup');
-      if (backupSession) {
-        const session = JSON.parse(backupSession);
-        console.log('🔄 게스트 세션 복원 시도...');
-        
-        const { data, error } = await supabase.auth.setSession({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token
-        });
-        
-        if (!error && data?.session) {
-          console.log('✅ 게스트 세션 복원 성공');
-          await AsyncStorage.setItem('guest_session', JSON.stringify(data.session));
-          await AsyncStorage.removeItem('guest_session_backup');
-          return true;
-        } else {
-          console.log('❌ 게스트 세션 복원 실패:', error?.message);
-          await AsyncStorage.removeItem('guest_session_backup');
-        }
+      const backupSession = await AsyncStorage.getItem("guest_session_backup");
+      if (!backupSession) return false;
+
+      const session = JSON.parse(backupSession);
+      const { data, error } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+
+      if (!error && data?.session) {
+        await AsyncStorage.setItem(
+          "guest_session",
+          JSON.stringify(data.session),
+        );
+        await AsyncStorage.removeItem("guest_session_backup");
+        return true;
       }
+      await AsyncStorage.removeItem("guest_session_backup");
       return false;
     } catch (error) {
-      console.error('❌ 게스트 세션 복원 오류:', error);
+      console.error("❌ 게스트 세션 복원 오류:", error);
       return false;
     }
   },
 
   clearGuestBackup: async () => {
     try {
-      await AsyncStorage.removeItem('guest_session_backup');
-      console.log('🗑️ 게스트 세션 백업 삭제 완료');
+      await AsyncStorage.removeItem("guest_session_backup");
     } catch (error) {
-      console.error('❌ 게스트 백업 삭제 실패:', error);
+      console.error("❌ 게스트 백업 삭제 실패:", error);
     }
   },
 }));
